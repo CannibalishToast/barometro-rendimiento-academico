@@ -1,0 +1,241 @@
+openapi: 3.0.3
+info:
+  title: Alerta Temprana de Rendimiento Académico – API
+  version: 0.1.0
+  description: >
+    Contrato REST inicial del Sprint 1 (EQUIPO-5). Basado en SCRUM-7 (RF-01, RF-02)
+    y SCRUM-14 (RF-04). Sin autenticación todavía: se usa un estudiante de prueba fijo
+    y los datos van en memoria.
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Materias
+    description: RF-01 Registrar materias con docente, horario y salón
+  - name: Notas
+    description: RF-02 Registrar notas por corte en cada materia
+  - name: Estado
+    description: RF-04 Identificar información incompleta y evitar alertas incorrectas
+
+paths:
+  /api/materias:
+    post:
+      tags: [Materias]
+      summary: Registrar una materia (RF-01, CA-01.1, CA-01.2, CA-01.4)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MateriaEntrada' }
+            example:
+              nombre: Cálculo Integral
+              docente: Laura Gómez
+              horario: { dias: [LUNES, MIERCOLES], horaInicio: '08:00', horaFin: '10:00' }
+              salon: B-204
+      responses:
+        '201':
+          description: Materia registrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Materia' }
+        '400':
+          description: Falta un dato obligatorio
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Falta el salón de la materia. }
+    get:
+      tags: [Materias]
+      summary: Consultar las materias del estudiante (RF-01, CA-01.3)
+      responses:
+        '200':
+          description: Lista de materias del estudiante
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Materia' }
+
+  /api/materias/{materiaId}/notas:
+    parameters:
+      - $ref: '#/components/parameters/MateriaId'
+    post:
+      tags: [Notas]
+      summary: Registrar una nota en un corte (RF-02, CA-02.1 a CA-02.4, CA-02.6)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotaEntrada' }
+            example: { corte: 1, descripcion: Parcial 1, valor: 3.8, porcentaje: 30 }
+      responses:
+        '201':
+          description: Nota registrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Nota' }
+        '400':
+          description: >
+            Dato faltante o inválido; no se guarda nada (CA-02.2, CA-02.3, RNF-04).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                notaFueraDeRango:
+                  value: { error: La nota debe estar entre 0.0 y 5.0. No se guardó. }
+                porcentajeInvalido:
+                  value: { error: El porcentaje debe ser mayor que 0 y hasta 100. No se guardó. }
+                corteSupera100:
+                  value: { error: Los porcentajes del corte no pueden superar el 100%. No se guardó. }
+                datoFaltante:
+                  value: { error: Falta el porcentaje de la nota. }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/MateriaNoExiste' }
+    get:
+      tags: [Notas]
+      summary: Consultar las notas de una materia agrupadas por corte (RF-02, CA-02.5)
+      responses:
+        '200':
+          description: Notas de la materia agrupadas por corte
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/NotasPorCorte' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/MateriaNoExiste' }
+
+  /api/materias/{materiaId}/estado:
+    parameters:
+      - $ref: '#/components/parameters/MateriaId'
+    get:
+      tags: [Estado]
+      summary: Consultar si la materia tiene información completa (RF-04, CA-04.1 a CA-04.7)
+      description: >
+        Regla propuesta, pendiente de confirmar por Producto: una materia tiene información
+        completa cuando, en cada corte con notas, los porcentajes suman 100%. Con información
+        incompleta no se calcula riesgo ni se genera alerta (RN-01, RNF-03). El nivel
+        Despejado / Nublado / Tormenta se agrega con RF-03.
+      responses:
+        '200':
+          description: Estado de la información de la materia
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EstadoMateria' }
+              examples:
+                incompleta:
+                  value:
+                    materiaId: 1
+                    estado: INFORMACION_INCOMPLETA
+                    alertaGenerada: false
+                    faltantes: [{ corte: 2, porcentajeRegistrado: 60 }]
+                    mensaje: Faltan notas del corte 2 (llevas 60% de 100%). Completa tus notas para calcular el estado.
+                    aviso: Este sistema no es la fuente oficial de notas. Verifica en intraUAM.
+                completa:
+                  value:
+                    materiaId: 1
+                    estado: COMPLETA
+                    alertaGenerada: false
+                    faltantes: []
+                    mensaje: La información de la materia está completa.
+                    aviso: Este sistema no es la fuente oficial de notas. Verifica en intraUAM.
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/MateriaNoExiste' }
+
+components:
+  parameters:
+    MateriaId:
+      name: materiaId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+
+  responses:
+    MateriaNoExiste:
+      description: La materia no existe
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: La materia no existe. }
+    SinPermiso:
+      description: >
+        Solo el estudiante dueño de la materia (RN-04, RNF-02). Se implementa cuando exista
+        autenticación.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Solo el estudiante dueño de la materia puede registrar notas. }
+
+  schemas:
+    Horario:
+      type: object
+      required: [dias, horaInicio, horaFin]
+      properties:
+        dias:
+          type: array
+          minItems: 1
+          items: { type: string, enum: [LUNES, MARTES, MIERCOLES, JUEVES, VIERNES, SABADO] }
+        horaInicio: { type: string, example: '08:00' }
+        horaFin: { type: string, example: '10:00' }
+
+    MateriaEntrada:
+      type: object
+      required: [nombre, docente, horario, salon]
+      properties:
+        nombre: { type: string }
+        docente: { type: string, description: Nombre del profesor (texto en el Sprint 1) }
+        horario: { $ref: '#/components/schemas/Horario' }
+        salon: { type: string }
+
+    Materia:
+      allOf:
+        - type: object
+          properties:
+            id: { type: integer, format: int64 }
+        - $ref: '#/components/schemas/MateriaEntrada'
+
+    NotaEntrada:
+      type: object
+      required: [corte, descripcion, valor, porcentaje]
+      properties:
+        corte: { type: integer, enum: [1, 2, 3] }
+        descripcion: { type: string }
+        valor: { type: number, minimum: 0.0, maximum: 5.0 }
+        porcentaje: { type: number, exclusiveMinimum: true, minimum: 0, maximum: 100 }
+
+    Nota:
+      allOf:
+        - type: object
+          properties:
+            id: { type: integer, format: int64 }
+            materiaId: { type: integer, format: int64 }
+        - $ref: '#/components/schemas/NotaEntrada'
+
+    NotasPorCorte:
+      type: object
+      properties:
+        corte: { type: integer, enum: [1, 2, 3] }
+        porcentajeRegistrado: { type: number }
+        notas:
+          type: array
+          items: { $ref: '#/components/schemas/Nota' }
+
+    EstadoMateria:
+      type: object
+      properties:
+        materiaId: { type: integer, format: int64 }
+        estado: { type: string, enum: [INFORMACION_INCOMPLETA, COMPLETA] }
+        alertaGenerada: { type: boolean }
+        faltantes:
+          type: array
+          items:
+            type: object
+            properties:
+              corte: { type: integer }
+              porcentajeRegistrado: { type: number }
+        mensaje: { type: string }
+        aviso: { type: string }
+
+    Error:
+      type: object
+      properties:
+        error: { type: string }
