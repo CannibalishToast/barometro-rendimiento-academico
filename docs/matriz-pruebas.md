@@ -11,9 +11,9 @@ Las pruebas se ejecutan directamente contra la API, sin pasar por la interfaz (R
 | CP-12 | CA-01.1 | Éxito | Nombre, docente (texto), horario (días, horaInicio, horaFin) y salón válidos / POST /api/materias | 201; devuelve la materia con su id | Respuesta + GET materias |
 | CP-13 | CA-01.2, 01.4 | Dato faltante | Materia sin salón / POST materias | 400 "Falta el salón de la materia." | Respuesta |
 | CP-14 | CA-01.3 | Éxito (consulta) | Estudiante con materias registradas / GET /api/materias | 200; la lista incluye la materia registrada | Respuesta |
-| CP-21 | CA-01.2, 01.4 | Dato faltante | Materia sin nombre / POST materias | 400 que indica el dato faltante (mensaje según contrato) | Respuesta |
-| CP-22 | CA-01.2, 01.4 | Dato faltante | Materia sin docente / POST materias | 400 que indica el dato faltante | Respuesta |
-| CP-23 | CA-01.2, 01.4 | Dato faltante | Horario incompleto (sin horaFin) / POST materias | 400 que indica el dato faltante | Respuesta |
+| CP-21 | CA-01.2, 01.4 | Dato faltante | Materia sin nombre / POST materias | 400 "Falta el nombre de la materia." | Respuesta |
+| CP-22 | CA-01.2, 01.4 | Dato faltante | Materia sin docente / POST materias | 400 "Falta el docente de la materia." | Respuesta |
+| CP-23 | CA-01.2, 01.4 | Dato faltante | Horario incompleto (sin horaFin) / POST materias | 400 "Falta la hora de fin del horario." | Respuesta |
 | CP-24 | CA-01.4 | No modificación | Después de CP-13 o CP-21 a CP-23 | La lista de materias queda igual; no se guardó el registro incompleto | GET antes/después |
 | CP-25 | CA-01.3 | Asociar notas | Materia recién registrada / POST /api/materias/{id}/notas con una nota válida | 201 (la materia queda disponible para asociarle notas) | Respuesta |
 
@@ -28,7 +28,7 @@ Las pruebas se ejecutan directamente contra la API, sin pasar por la interfaz (R
 | CP-05 | CA-02.2, 02.3 | Rechazo | Corte con 80% acumulado; se registra una nota de 30% | 400 "Los porcentajes del corte no pueden superar el 100%. No se guardó." | Respuesta |
 | CP-06 | CA-02.2, 02.3 | No modificación | Después de CP-05 | Las notas del corte quedan iguales | GET antes/después |
 | CP-07 | CA-02.2, 02.3 | Límite | Corte con 70% acumulado; se registra una nota de 30% (suma 100%) | 201 | Respuesta |
-| CP-08 | CA-02.3 | Dato inválido | Porcentaje 0 o 101 / POST notas | 400 que indica el dato inválido (porcentaje mayor que 0 y hasta 100); texto exacto pendiente | Respuesta |
+| CP-08 | CA-02.3 | Dato inválido | Porcentaje 0 o 101 / POST notas | 400 "El porcentaje debe ser mayor que 0 y hasta 100. No se guardó." | Respuesta |
 | CP-09 | RF-02 | Materia inexistente | materiaId inexistente / POST notas | 404 "La materia no existe." | Respuesta |
 | CP-10 | CA-02.5 | Éxito | Materia con notas en los cortes 1 y 2 / GET /api/materias/{id}/notas | 200; notas agrupadas por corte | Respuesta |
 | CP-11 | CA-02.5 | Materia inexistente | materiaId inexistente / GET notas | 404 | Respuesta |
@@ -64,8 +64,11 @@ Todavía no tienen contrato o requieren autenticación.
 
 CP-D1 y CP-D2 se activaron con el contrato de RF-04 y ahora son CP-15 y CP-16.
 
+## Ejecución automatizada
+
+Los casos de RF-01, RF-02 y RF-04 están en la colección de Postman `docs/pruebas/barometro-matriz.postman_collection.json`. Se corre en orden con el servicio recién iniciado, porque usa los datos de prueba de SCRUM-38 (materias 1 a 5). Los mensajes de CP-08 salen de `openapi.yaml`, y los de CP-21 a CP-23 de las validaciones de Backend (SCRUM-41).
+
 ## Pendientes
 
-- Texto exacto del mensaje de error de CP-08 (consultado a Backend).
 - Si la descripción de la nota es obligatoria, y qué devuelve el GET de notas de una materia sin notas.
 - Confirmación de Producto de la regla del 100% por corte de RF-04. Duda adicional: con la regla literal, una materia con solo el corte 1 completo saldría como COMPLETA.
