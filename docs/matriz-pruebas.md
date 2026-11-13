@@ -40,14 +40,20 @@ Las pruebas se ejecutan directamente contra la API, sin pasar por la interfaz (R
 
 ## RF-04: Información incompleta
 
-Regla propuesta, pendiente de confirmar por Producto: una materia tiene información completa cuando cada corte que tenga notas suma 100%.
+Regla confirmada:
+
+1. Un corte con notas está completo si sus porcentajes suman 100%.
+2. Un corte sin notas se ignora.
+3. Una materia sin ninguna nota es INFORMACION_INCOMPLETA.
+
+Datos de prueba usados: materia 1 (sin notas), materia 2 (corte 1 al 100%, corte 2 al 60%, corte 3 sin notas) y materia 4 (los tres cortes al 100%).
 
 | Caso | CA | Tipo | Dado / Cuando | Resultado esperado | Evidencia |
 |---|---|---|---|---|---|
-| CP-15 | CA-04.1, 04.2, 04.4, 04.5 | Éxito (incompleta) | Materia con notas del corte 2 que suman 60% / GET /api/materias/{id}/estado | 200; "INFORMACION_INCOMPLETA"; alertaGenerada: false; indica corte y porcentaje faltante; mensaje "Faltan notas del corte 2 (llevas 60% de 100%). Completa tus notas para calcular el estado." | Respuesta (CA-04.6, RNF-04) |
-| CP-16 | CA-04.1, 04.2, 04.4, 04.5 | Sin notas | Materia sin ninguna nota / GET estado | 200; "INFORMACION_INCOMPLETA" y alertaGenerada: false | Respuesta |
-| CP-17 | CA-04.3 | Éxito (completa) | Cortes con notas que suman 100% cada uno / GET estado | 200; estado "COMPLETA" (sin nivel de riesgo todavía, RF-03) | Respuesta |
-| CP-18 | CA-04.3, RNF-03 | Antes/después | Materia de CP-15; se registra una nota de 40% en el corte 2 / GET estado otra vez | Pasa de "INFORMACION_INCOMPLETA" a "COMPLETA" | Comparación antes/después |
+| CP-15 | CA-04.1, 04.2, 04.4, 04.5 | Éxito (incompleta) | Materia 2: corte 2 suma 60% / GET /api/materias/{id}/estado | 200; "INFORMACION_INCOMPLETA"; alertaGenerada: false; indica corte y porcentaje faltante; mensaje "Faltan notas del corte 2 (llevas 60% de 100%). Completa tus notas para calcular el estado." | Respuesta (CA-04.6, RNF-04) |
+| CP-16 | CA-04.1, 04.2, 04.4, 04.5 | Sin notas | Materia 1, sin ninguna nota (regla 3) / GET estado | 200; "INFORMACION_INCOMPLETA" y alertaGenerada: false | Respuesta |
+| CP-17 | CA-04.3 | Éxito (completa) | Materia 4: los tres cortes suman 100% (regla 1) / GET estado | 200; estado "COMPLETA" (sin nivel de riesgo todavía, RF-03) | Respuesta |
+| CP-18 | CA-04.3, RNF-03 | Antes/después | Materia 2 de CP-15; se registra una nota de 40% en el corte 2 / GET estado otra vez | Pasa de "INFORMACION_INCOMPLETA" a "COMPLETA" aunque el corte 3 no tenga notas (regla 2) | Comparación antes/después |
 | CP-19 | RN-03 | Aviso | Cualquier respuesta de estado (CP-15, CP-16, CP-17) | Incluye "Este sistema no es la fuente oficial de notas. Verifica en intraUAM." | Respuesta |
 | CP-20 | RF-04 | Materia inexistente | materiaId inexistente / GET estado | 404 "La materia no existe." | Respuesta |
 
@@ -68,7 +74,8 @@ CP-D1 y CP-D2 se activaron con el contrato de RF-04 y ahora son CP-15 y CP-16.
 
 Los casos de RF-01, RF-02 y RF-04 están en la colección de Postman `docs/pruebas/barometro-matriz.postman_collection.json`. Se corre en orden con el servicio recién iniciado, porque usa los datos de prueba de SCRUM-38 (materias 1 a 5). Los mensajes de CP-08 salen de `openapi.yaml`, y los de CP-21 a CP-23 de las validaciones de Backend (SCRUM-41).
 
-## Pendientes
+## Decisiones cerradas
 
-- Si la descripción de la nota es obligatoria, y qué devuelve el GET de notas de una materia sin notas.
-- Confirmación de Producto de la regla del 100% por corte de RF-04. Duda adicional: con la regla literal, una materia con solo el corte 1 completo saldría como COMPLETA.
+- La descripción de la nota es obligatoria: si falta, 400 "Falta la descripción de la nota." (validación de Backend, SCRUM-43).
+- El GET de notas de una materia sin notas devuelve [] (CP-29).
+- Regla de información completa de RF-04 confirmada (ver arriba).
