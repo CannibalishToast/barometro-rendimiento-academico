@@ -11,7 +11,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
  * Convierte los errores en respuestas del contrato: 400 con el dato que falla o la
- * regla incumplida, y 404 cuando el recurso no existe. Las validaciones se hacen en el backend (RNF-04).
+ * regla incumplida, 403 cuando la materia no es del estudiante y 404 cuando el
+ * recurso no existe. Las validaciones se hacen en el backend (RNF-04).
  */
 @RestControllerAdvice
 public class ManejadorErrores {
@@ -41,6 +42,12 @@ public class ManejadorErrores {
     @ExceptionHandler(ReglaDeNegocioException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse reglaIncumplida(ReglaDeNegocioException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(SinPermisoException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse sinPermiso(SinPermisoException ex) {
         return new ErrorResponse(ex.getMessage());
     }
 }

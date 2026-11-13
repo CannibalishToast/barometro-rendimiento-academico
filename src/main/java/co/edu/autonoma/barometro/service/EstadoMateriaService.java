@@ -3,6 +3,8 @@ package co.edu.autonoma.barometro.service;
 import co.edu.autonoma.barometro.dto.CorteFaltante;
 import co.edu.autonoma.barometro.dto.EstadoMateriaResponse;
 import co.edu.autonoma.barometro.exception.RecursoNoEncontradoException;
+import co.edu.autonoma.barometro.exception.SinPermisoException;
+import co.edu.autonoma.barometro.model.Materia;
 import co.edu.autonoma.barometro.model.Nota;
 import co.edu.autonoma.barometro.repository.MateriaRepository;
 import co.edu.autonoma.barometro.repository.NotaRepository;
@@ -27,6 +29,7 @@ public class EstadoMateriaService {
     public static final String AVISO =
             "Este sistema no es la fuente oficial de notas. Verifica en intraUAM.";
 
+    private static final Long ESTUDIANTE_PRUEBA_ID = 1L;
     private static final double PORCENTAJE_COMPLETO = 100.0;
     private static final double TOLERANCIA = 0.000001;
 
@@ -39,7 +42,7 @@ public class EstadoMateriaService {
     }
 
     public EstadoMateriaResponse consultar(Long materiaId) {
-        verificarQueExisteLaMateria(materiaId);
+        verificarAcceso(materiaId, "Solo el estudiante dueño de la materia puede consultar su estado.");
 
         Map<Integer, List<Nota>> notasPorCorte =
                 notaRepository.listarPorMateriaAgrupadasPorCorte(materiaId);
@@ -64,9 +67,12 @@ public class EstadoMateriaService {
                 mensajeDeFaltantes(faltantes), AVISO);
     }
 
-    private void verificarQueExisteLaMateria(Long materiaId) {
-        materiaRepository.buscarPorId(materiaId)
+    private void verificarAcceso(Long materiaId, String mensajeSinPermiso) {
+        Materia materia = materiaRepository.buscarPorId(materiaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("La materia no existe."));
+        if (!ESTUDIANTE_PRUEBA_ID.equals(materia.getIdEstudiante())) {
+            throw new SinPermisoException(mensajeSinPermiso);
+        }
     }
 
     private String mensajeDeFaltantes(List<CorteFaltante> faltantes) {

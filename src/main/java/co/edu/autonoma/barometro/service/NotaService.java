@@ -5,6 +5,8 @@ import co.edu.autonoma.barometro.dto.NotaResponse;
 import co.edu.autonoma.barometro.dto.NotasPorCorteResponse;
 import co.edu.autonoma.barometro.exception.RecursoNoEncontradoException;
 import co.edu.autonoma.barometro.exception.ReglaDeNegocioException;
+import co.edu.autonoma.barometro.exception.SinPermisoException;
+import co.edu.autonoma.barometro.model.Materia;
 import co.edu.autonoma.barometro.model.Nota;
 import co.edu.autonoma.barometro.repository.MateriaRepository;
 import co.edu.autonoma.barometro.repository.NotaRepository;
@@ -13,12 +15,14 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * Lógica de las notas (RF-02): revisa que la materia exista y que el corte
- * no supere el 100% antes de guardar, y consulta las notas agrupadas por corte.
+ * Lógica de las notas (RF-02): revisa que la materia exista y sea del estudiante
+ * (RN-04) y que el corte no supere el 100% antes de guardar, y consulta las notas
+ * agrupadas por corte.
  */
 @Service
 public class NotaService {
 
+    private static final Long ESTUDIANTE_PRUEBA_ID = 1L;
     private static final double PORCENTAJE_MAXIMO_CORTE = 100.0;
     private static final double TOLERANCIA = 0.000001;
 
@@ -31,7 +35,7 @@ public class NotaService {
     }
 
     public NotaResponse registrar(Long materiaId, NotaRequest request) {
-        verificarQueExisteLaMateria(materiaId);
+        verificarAcceso(materiaId, "Solo el estudiante dueño de la materia puede registrar notas.");
 
         double yaRegistrado = notaRepository.sumaPorcentajes(materiaId, request.corte());
         if (yaRegistrado + request.porcentaje() > PORCENTAJE_MAXIMO_CORTE + TOLERANCIA) {
@@ -46,16 +50,19 @@ public class NotaService {
     }
 
     public List<NotasPorCorteResponse> listarPorCorte(Long materiaId) {
-        verificarQueExisteLaMateria(materiaId);
+        verificarAcceso(materiaId, "Solo el estudiante dueño de la materia puede consultar sus notas.");
 
         return notaRepository.listarPorMateriaAgrupadasPorCorte(materiaId).entrySet().stream()
                 .map(grupo -> aCorte(materiaId, grupo.getKey(), grupo.getValue()))
                 .toList();
     }
 
-    private void verificarQueExisteLaMateria(Long materiaId) {
-        materiaRepository.buscarPorId(materiaId)
+    private void verificarAcceso(Long materiaId, String mensajeSinPermiso) {
+        Materia materia = materiaRepository.buscarPorId(materiaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("La materia no existe."));
+        if (!ESTUDIANTE_PRUEBA_ID.equals(materia.getIdEstudiante())) {
+            throw new SinPermisoException(mensajeSinPermiso);
+        }
     }
 
     private NotaResponse aRespuesta(Nota nota) {

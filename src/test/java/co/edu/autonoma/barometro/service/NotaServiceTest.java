@@ -5,6 +5,7 @@ import co.edu.autonoma.barometro.dto.NotaResponse;
 import co.edu.autonoma.barometro.dto.NotasPorCorteResponse;
 import co.edu.autonoma.barometro.exception.RecursoNoEncontradoException;
 import co.edu.autonoma.barometro.exception.ReglaDeNegocioException;
+import co.edu.autonoma.barometro.exception.SinPermisoException;
 import co.edu.autonoma.barometro.model.Materia;
 import co.edu.autonoma.barometro.repository.MateriaRepository;
 import co.edu.autonoma.barometro.repository.NotaRepository;
@@ -25,8 +26,9 @@ class NotaServiceTest {
     private NotaRepository notaRepository;
     private NotaService service;
     private Long materiaId;
+    private Long materiaAjenaId;
 
-    // Antes de cada prueba: repositorios nuevos y una materia guardada para ponerle notas
+    // Antes de cada prueba: repositorios nuevos, una materia del estudiante 1 y otra del estudiante 2
     @BeforeEach
     void preparar() {
         MateriaRepository materiaRepository = new MateriaRepository();
@@ -36,6 +38,10 @@ class NotaServiceTest {
         Materia materia = materiaRepository.guardar(new Materia(null, 1L, "Cálculo", "Profe Gómez",
                 List.of("Lunes"), LocalTime.of(8, 0), LocalTime.of(10, 0), "Salón 204"));
         materiaId = materia.getId();
+
+        Materia ajena = materiaRepository.guardar(new Materia(null, 2L, "Física", "Profe Ruiz",
+                List.of("Martes"), LocalTime.of(10, 0), LocalTime.of(12, 0), "Salón 101"));
+        materiaAjenaId = ajena.getId();
     }
 
     // Una nota de ejemplo, solo cambian el corte y el porcentaje
@@ -108,5 +114,19 @@ class NotaServiceTest {
     void listarPorCorteDeMateriaQueNoExisteLanzaNoEncontrado() {
         assertThrows(RecursoNoEncontradoException.class,
                 () -> service.listarPorCorte(MATERIA_QUE_NO_EXISTE));
+    }
+
+    @Test
+    void registrarEnMateriaDeOtroEstudianteLanzaSinPermisoYNoGuarda() {
+        SinPermisoException error = assertThrows(SinPermisoException.class,
+                () -> service.registrar(materiaAjenaId, nota(1, 30)));
+
+        assertEquals("Solo el estudiante dueño de la materia puede registrar notas.", error.getMessage());
+        assertTrue(notaRepository.listarPorMateria(materiaAjenaId).isEmpty());
+    }
+
+    @Test
+    void listarPorCorteDeMateriaDeOtroEstudianteLanzaSinPermiso() {
+        assertThrows(SinPermisoException.class, () -> service.listarPorCorte(materiaAjenaId));
     }
 }
