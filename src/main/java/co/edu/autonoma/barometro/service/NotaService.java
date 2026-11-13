@@ -2,6 +2,7 @@ package co.edu.autonoma.barometro.service;
 
 import co.edu.autonoma.barometro.dto.NotaRequest;
 import co.edu.autonoma.barometro.dto.NotaResponse;
+import co.edu.autonoma.barometro.dto.NotasPorCorteResponse;
 import co.edu.autonoma.barometro.exception.RecursoNoEncontradoException;
 import co.edu.autonoma.barometro.exception.ReglaDeNegocioException;
 import co.edu.autonoma.barometro.model.Nota;
@@ -9,9 +10,11 @@ import co.edu.autonoma.barometro.repository.MateriaRepository;
 import co.edu.autonoma.barometro.repository.NotaRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 /**
  * Lógica de las notas (RF-02): revisa que la materia exista y que el corte
- * no supere el 100% antes de guardar.
+ * no supere el 100% antes de guardar, y consulta las notas agrupadas por corte.
  */
 @Service
 public class NotaService {
@@ -42,6 +45,14 @@ public class NotaService {
         return aRespuesta(guardada);
     }
 
+    public List<NotasPorCorteResponse> listarPorCorte(Long materiaId) {
+        verificarQueExisteLaMateria(materiaId);
+
+        return notaRepository.listarPorMateriaAgrupadasPorCorte(materiaId).entrySet().stream()
+                .map(grupo -> aCorte(materiaId, grupo.getKey(), grupo.getValue()))
+                .toList();
+    }
+
     private void verificarQueExisteLaMateria(Long materiaId) {
         materiaRepository.buscarPorId(materiaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("La materia no existe."));
@@ -50,5 +61,11 @@ public class NotaService {
     private NotaResponse aRespuesta(Nota nota) {
         return new NotaResponse(nota.getId(), nota.getIdMateria(), nota.getCorte(),
                 nota.getDescripcion(), nota.getValor(), nota.getPorcentaje());
+    }
+
+    private NotasPorCorteResponse aCorte(Long materiaId, Integer corte, List<Nota> notas) {
+        double porcentajeRegistrado = notaRepository.sumaPorcentajes(materiaId, corte);
+        List<NotaResponse> notasDelCorte = notas.stream().map(this::aRespuesta).toList();
+        return new NotasPorCorteResponse(corte, porcentajeRegistrado, notasDelCorte);
     }
 }
