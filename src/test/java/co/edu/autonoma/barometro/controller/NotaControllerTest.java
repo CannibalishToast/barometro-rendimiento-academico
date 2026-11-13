@@ -5,6 +5,7 @@ import co.edu.autonoma.barometro.dto.NotaResponse;
 import co.edu.autonoma.barometro.dto.NotasPorCorteResponse;
 import co.edu.autonoma.barometro.exception.RecursoNoEncontradoException;
 import co.edu.autonoma.barometro.exception.ReglaDeNegocioException;
+import co.edu.autonoma.barometro.exception.SinPermisoException;
 import co.edu.autonoma.barometro.service.NotaService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -98,6 +99,17 @@ class NotaControllerTest {
         mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(NOTA_VALIDA))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("La materia no existe."));
+    }
+
+    @Test
+    void registrarEnMateriaAjenaResponde403() throws Exception {
+        when(notaService.registrar(eq(3L), any(NotaRequest.class))).thenThrow(new SinPermisoException(
+                "Solo el estudiante dueño de la materia puede registrar notas."));
+
+        mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(NOTA_VALIDA))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error")
+                        .value("Solo el estudiante dueño de la materia puede registrar notas."));
     }
 
     @Test

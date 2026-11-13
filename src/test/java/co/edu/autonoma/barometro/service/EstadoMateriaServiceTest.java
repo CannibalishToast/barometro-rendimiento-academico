@@ -3,6 +3,7 @@ package co.edu.autonoma.barometro.service;
 import co.edu.autonoma.barometro.dto.CorteFaltante;
 import co.edu.autonoma.barometro.dto.EstadoMateriaResponse;
 import co.edu.autonoma.barometro.exception.RecursoNoEncontradoException;
+import co.edu.autonoma.barometro.exception.SinPermisoException;
 import co.edu.autonoma.barometro.model.Materia;
 import co.edu.autonoma.barometro.model.Nota;
 import co.edu.autonoma.barometro.repository.MateriaRepository;
@@ -23,8 +24,9 @@ class EstadoMateriaServiceTest {
     private NotaRepository notaRepository;
     private EstadoMateriaService service;
     private Long materiaId;
+    private Long materiaAjenaId;
 
-    // Antes de cada prueba: repositorios nuevos y una materia sin notas
+    // Antes de cada prueba: repositorios nuevos, una materia sin notas y otra de otro estudiante
     @BeforeEach
     void preparar() {
         MateriaRepository materiaRepository = new MateriaRepository();
@@ -34,6 +36,10 @@ class EstadoMateriaServiceTest {
         Materia materia = materiaRepository.guardar(new Materia(null, 1L, "Álgebra", "Profe Gómez",
                 List.of("Lunes"), LocalTime.of(8, 0), LocalTime.of(10, 0), "Salón 204"));
         materiaId = materia.getId();
+
+        Materia ajena = materiaRepository.guardar(new Materia(null, 2L, "Física", "Profe Ruiz",
+                List.of("Martes"), LocalTime.of(10, 0), LocalTime.of(12, 0), "Salón 101"));
+        materiaAjenaId = ajena.getId();
     }
 
     // Guarda una nota de 4.0 en el corte y con el porcentaje indicados
@@ -102,5 +108,14 @@ class EstadoMateriaServiceTest {
     @Test
     void materiaQueNoExisteLanzaNoEncontrado() {
         assertThrows(RecursoNoEncontradoException.class, () -> service.consultar(99L));
+    }
+
+    @Test
+    void estadoDeMateriaDeOtroEstudianteLanzaSinPermiso() {
+        SinPermisoException error = assertThrows(SinPermisoException.class,
+                () -> service.consultar(materiaAjenaId));
+
+        assertEquals("Solo el estudiante dueño de la materia puede consultar su estado.",
+                error.getMessage());
     }
 }
