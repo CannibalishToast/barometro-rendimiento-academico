@@ -17,7 +17,7 @@ import java.util.List;
 /**
  * Lógica de las notas (RF-02): revisa que la materia exista y sea del estudiante
  * (RN-04) y que el corte no supere el 100% antes de guardar, y consulta las notas
- * agrupadas por corte.
+ * agrupadas por corte. Después de guardar una nota revisa si hay que crear una alerta (RF-05).
  */
 @Service
 public class NotaService {
@@ -28,10 +28,13 @@ public class NotaService {
 
     private final MateriaRepository materiaRepository;
     private final NotaRepository notaRepository;
+    private final AlertaService alertaService;
 
-    public NotaService(MateriaRepository materiaRepository, NotaRepository notaRepository) {
+    public NotaService(MateriaRepository materiaRepository, NotaRepository notaRepository,
+                       AlertaService alertaService) {
         this.materiaRepository = materiaRepository;
         this.notaRepository = notaRepository;
+        this.alertaService = alertaService;
     }
 
     public NotaResponse registrar(Long materiaId, NotaRequest request) {
@@ -46,6 +49,9 @@ public class NotaService {
         Nota nota = new Nota(null, materiaId, request.corte(), request.descripcion(),
                 request.valor(), request.porcentaje(), null);
         Nota guardada = notaRepository.guardar(nota);
+        // RF-05: con la nota nueva se recalcula el riesgo y, si hace falta, se crea la alerta.
+        // La respuesta de la nota no cambia (contrato).
+        alertaService.generarSiHayRiesgo(materiaId);
         return aRespuesta(guardada);
     }
 
