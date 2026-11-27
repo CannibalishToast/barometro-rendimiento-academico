@@ -1,0 +1,1320 @@
+{
+  "info": {
+    "_postman_id": "17590575-f9cf-43b1-a67d-4ce12f45e763",
+    "name": "Barómetro – Matriz de pruebas (SCRUM-9)",
+    "description": "Casos de la matriz de pruebas (docs/matriz-pruebas.md) contra la API. Correr en orden con el servicio recién iniciado (datos de prueba de SCRUM-38). Las carpetas RF-02 y RF-04 fallan hasta que Backend fusione sus endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "materiaNueva",
+      "value": ""
+    },
+    {
+      "key": "materiaPOO",
+      "value": "3"
+    },
+    {
+      "key": "antes",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "RF-01 Materias",
+      "item": [
+        {
+          "name": "CP-12 Registrar materia válida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias"
+              ]
+            },
+            "description": "CA-01.1. Registra una materia nueva y guarda su id en la variable materiaNueva (la usan CP-25, CP-01, CP-02 y siguientes).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Cálculo Integral\",\n  \"docente\": \"Docente de prueba QA\",\n  \"horario\": {\n    \"dias\": [\n      \"LUNES\",\n      \"MIERCOLES\"\n    ],\n    \"horaInicio\": \"08:00\",\n    \"horaFin\": \"10:00\"\n  },\n  \"salon\": \"B-204\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "const m = pm.response.json();",
+                  "pm.test(\"Devuelve la materia con su id\", () => pm.expect(m.id).to.be.a(\"number\"));",
+                  "pm.test(\"Devuelve los datos enviados\", () => {",
+                  "  pm.expect(m.nombre).to.eql(\"Cálculo Integral\");",
+                  "  pm.expect(m.salon).to.eql(\"B-204\");",
+                  "});",
+                  "pm.collectionVariables.set(\"materiaNueva\", m.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-14 Consultar materias del estudiante",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias"
+              ]
+            },
+            "description": "CA-01.3. La lista debe incluir la materia de CP-12 y las 5 materias de los datos de prueba (SCRUM-38)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const lista = pm.response.json();",
+                  "pm.test(\"La lista incluye la materia registrada en CP-12\", () =>",
+                  "  pm.expect(lista.map(m => m.id)).to.include(Number(pm.collectionVariables.get(\"materiaNueva\"))));",
+                  "pm.test(\"Incluye los datos de prueba (al menos 6 materias)\", () => pm.expect(lista.length).to.be.at.least(6));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-13 + CP-24 Materia sin salón",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias"
+              ]
+            },
+            "description": "CA-01.2, CA-01.4. Mensaje exacto del contrato. También verifica CP-24: no se guarda nada.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Cálculo Integral\",\n  \"docente\": \"Docente de prueba QA\",\n  \"horario\": {\n    \"dias\": [\n      \"LUNES\",\n      \"MIERCOLES\"\n    ],\n    \"horaInicio\": \"08:00\",\n    \"horaFin\": \"10:00\"\n  },\n  \"salon\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias\", (err, res) => {",
+                  "  pm.collectionVariables.set(\"antes\", res.json().length);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mensaje: Falta el salón de la materia.\", () => pm.expect(pm.response.json().error).to.eql(\"Falta el salón de la materia.\"));",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias\", (err, res) => {",
+                  "  pm.test(\"No modificación: la lista de materias quedó igual\", () =>",
+                  "    pm.expect(res.json().length).to.eql(Number(pm.collectionVariables.get(\"antes\"))));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-21 Materia sin nombre",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias"
+              ]
+            },
+            "description": "CA-01.2, CA-01.4.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"docente\": \"Docente de prueba QA\",\n  \"horario\": {\n    \"dias\": [\n      \"LUNES\",\n      \"MIERCOLES\"\n    ],\n    \"horaInicio\": \"08:00\",\n    \"horaFin\": \"10:00\"\n  },\n  \"salon\": \"B-204\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias\", (err, res) => {",
+                  "  pm.collectionVariables.set(\"antes\", res.json().length);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mensaje: Falta el nombre de la materia.\", () => pm.expect(pm.response.json().error).to.eql(\"Falta el nombre de la materia.\"));",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias\", (err, res) => {",
+                  "  pm.test(\"No modificación: la lista de materias quedó igual\", () =>",
+                  "    pm.expect(res.json().length).to.eql(Number(pm.collectionVariables.get(\"antes\"))));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-22 Materia sin docente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias"
+              ]
+            },
+            "description": "CA-01.2, CA-01.4.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Cálculo Integral\",\n  \"horario\": {\n    \"dias\": [\n      \"LUNES\",\n      \"MIERCOLES\"\n    ],\n    \"horaInicio\": \"08:00\",\n    \"horaFin\": \"10:00\"\n  },\n  \"salon\": \"B-204\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias\", (err, res) => {",
+                  "  pm.collectionVariables.set(\"antes\", res.json().length);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mensaje: Falta el docente de la materia.\", () => pm.expect(pm.response.json().error).to.eql(\"Falta el docente de la materia.\"));",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias\", (err, res) => {",
+                  "  pm.test(\"No modificación: la lista de materias quedó igual\", () =>",
+                  "    pm.expect(res.json().length).to.eql(Number(pm.collectionVariables.get(\"antes\"))));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-23 Horario sin horaFin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias"
+              ]
+            },
+            "description": "CA-01.2, CA-01.4.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Cálculo Integral\",\n  \"docente\": \"Docente de prueba QA\",\n  \"horario\": {\n    \"dias\": [\n      \"LUNES\",\n      \"MIERCOLES\"\n    ],\n    \"horaInicio\": \"08:00\"\n  },\n  \"salon\": \"B-204\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias\", (err, res) => {",
+                  "  pm.collectionVariables.set(\"antes\", res.json().length);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mensaje: Falta la hora de fin del horario.\", () => pm.expect(pm.response.json().error).to.eql(\"Falta la hora de fin del horario.\"));",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias\", (err, res) => {",
+                  "  pm.test(\"No modificación: la lista de materias quedó igual\", () =>",
+                  "    pm.expect(res.json().length).to.eql(Number(pm.collectionVariables.get(\"antes\"))));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RF-02 Notas",
+      "item": [
+        {
+          "name": "CP-25 + CP-01 Registrar nota válida en la materia nueva",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/{{materiaNueva}}/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "{{materiaNueva}}",
+                "notas"
+              ]
+            },
+            "description": "CA-01.3, CA-02.1, CA-02.4. Corte 1, valor 4.0, porcentaje 30.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corte\": 1,\n  \"descripcion\": \"Parcial 1\",\n  \"valor\": 4.0,\n  \"porcentaje\": 30\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "const n = pm.response.json();",
+                  "pm.test(\"Devuelve la nota con su id\", () => pm.expect(n.id).to.be.a(\"number\"));",
+                  "pm.test(\"Queda en la materia y el corte correctos\", () => {",
+                  "  pm.expect(n.materiaId).to.eql(Number(pm.collectionVariables.get(\"materiaNueva\")));",
+                  "  pm.expect(n.corte).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-02 + CP-03 Nota fuera de rango (5.1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/{{materiaNueva}}/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "{{materiaNueva}}",
+                "notas"
+              ]
+            },
+            "description": "CA-02.2, CA-02.3.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corte\": 1,\n  \"descripcion\": \"Quiz\",\n  \"valor\": 5.1,\n  \"porcentaje\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaNueva\") + \"/notas\", (err, res) => {",
+                  "  pm.collectionVariables.set(\"antes\", res.json().reduce((t, c) => t + c.notas.length, 0));",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mensaje: La nota debe estar entre 0.0 y 5.0. No se guardó.\", () => pm.expect(pm.response.json().error).to.eql(\"La nota debe estar entre 0.0 y 5.0. No se guardó.\"));",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaNueva\") + \"/notas\", (err, res) => {",
+                  "  const despues = res.json().reduce((t, c) => t + c.notas.length, 0);",
+                  "  pm.test(\"No modificación: las notas de la materia quedaron iguales\", () =>",
+                  "    pm.expect(despues).to.eql(Number(pm.collectionVariables.get(\"antes\"))));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-04 Nota sin porcentaje",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/{{materiaNueva}}/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "{{materiaNueva}}",
+                "notas"
+              ]
+            },
+            "description": "CA-02.6.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corte\": 1,\n  \"descripcion\": \"Quiz\",\n  \"valor\": 3.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaNueva\") + \"/notas\", (err, res) => {",
+                  "  pm.collectionVariables.set(\"antes\", res.json().reduce((t, c) => t + c.notas.length, 0));",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mensaje: Falta el porcentaje de la nota.\", () => pm.expect(pm.response.json().error).to.eql(\"Falta el porcentaje de la nota.\"));",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaNueva\") + \"/notas\", (err, res) => {",
+                  "  const despues = res.json().reduce((t, c) => t + c.notas.length, 0);",
+                  "  pm.test(\"No modificación: las notas de la materia quedaron iguales\", () =>",
+                  "    pm.expect(despues).to.eql(Number(pm.collectionVariables.get(\"antes\"))));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-08 Porcentaje 0",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/{{materiaNueva}}/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "{{materiaNueva}}",
+                "notas"
+              ]
+            },
+            "description": "CA-02.3. Mensaje tomado de openapi.yaml.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corte\": 1,\n  \"descripcion\": \"Quiz\",\n  \"valor\": 3.0,\n  \"porcentaje\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaNueva\") + \"/notas\", (err, res) => {",
+                  "  pm.collectionVariables.set(\"antes\", res.json().reduce((t, c) => t + c.notas.length, 0));",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mensaje: El porcentaje debe ser mayor que 0 y hasta 100. No se guardó.\", () => pm.expect(pm.response.json().error).to.eql(\"El porcentaje debe ser mayor que 0 y hasta 100. No se guardó.\"));",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaNueva\") + \"/notas\", (err, res) => {",
+                  "  const despues = res.json().reduce((t, c) => t + c.notas.length, 0);",
+                  "  pm.test(\"No modificación: las notas de la materia quedaron iguales\", () =>",
+                  "    pm.expect(despues).to.eql(Number(pm.collectionVariables.get(\"antes\"))));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-08 Porcentaje 101",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/{{materiaNueva}}/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "{{materiaNueva}}",
+                "notas"
+              ]
+            },
+            "description": "CA-02.3. Mensaje tomado de openapi.yaml.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corte\": 2,\n  \"descripcion\": \"Quiz\",\n  \"valor\": 3.0,\n  \"porcentaje\": 101\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaNueva\") + \"/notas\", (err, res) => {",
+                  "  pm.collectionVariables.set(\"antes\", res.json().reduce((t, c) => t + c.notas.length, 0));",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mensaje: El porcentaje debe ser mayor que 0 y hasta 100. No se guardó.\", () => pm.expect(pm.response.json().error).to.eql(\"El porcentaje debe ser mayor que 0 y hasta 100. No se guardó.\"));",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaNueva\") + \"/notas\", (err, res) => {",
+                  "  const despues = res.json().reduce((t, c) => t + c.notas.length, 0);",
+                  "  pm.test(\"No modificación: las notas de la materia quedaron iguales\", () =>",
+                  "    pm.expect(despues).to.eql(Number(pm.collectionVariables.get(\"antes\"))));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-26 Corte 4",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/{{materiaNueva}}/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "{{materiaNueva}}",
+                "notas"
+              ]
+            },
+            "description": "CA-02.3. El contrato no fija el texto: se verifica que indique el dato.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corte\": 4,\n  \"descripcion\": \"Quiz\",\n  \"valor\": 3.0,\n  \"porcentaje\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaNueva\") + \"/notas\", (err, res) => {",
+                  "  pm.collectionVariables.set(\"antes\", res.json().reduce((t, c) => t + c.notas.length, 0));",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Indica el dato que falla\", () => pm.expect(pm.response.json().error).to.be.a(\"string\").and.not.empty);",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaNueva\") + \"/notas\", (err, res) => {",
+                  "  const despues = res.json().reduce((t, c) => t + c.notas.length, 0);",
+                  "  pm.test(\"No modificación: las notas de la materia quedaron iguales\", () =>",
+                  "    pm.expect(despues).to.eql(Number(pm.collectionVariables.get(\"antes\"))));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-27 + CP-30 Nota sin valor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/{{materiaNueva}}/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "{{materiaNueva}}",
+                "notas"
+              ]
+            },
+            "description": "CA-02.6.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corte\": 1,\n  \"descripcion\": \"Quiz\",\n  \"porcentaje\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaNueva\") + \"/notas\", (err, res) => {",
+                  "  pm.collectionVariables.set(\"antes\", res.json().reduce((t, c) => t + c.notas.length, 0));",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Indica el dato que falla\", () => pm.expect(pm.response.json().error).to.be.a(\"string\").and.not.empty);",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaNueva\") + \"/notas\", (err, res) => {",
+                  "  const despues = res.json().reduce((t, c) => t + c.notas.length, 0);",
+                  "  pm.test(\"No modificación: las notas de la materia quedaron iguales\", () =>",
+                  "    pm.expect(despues).to.eql(Number(pm.collectionVariables.get(\"antes\"))));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-28 + CP-30 Nota sin corte",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/{{materiaNueva}}/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "{{materiaNueva}}",
+                "notas"
+              ]
+            },
+            "description": "CA-02.6.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descripcion\": \"Quiz\",\n  \"valor\": 3.0,\n  \"porcentaje\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaNueva\") + \"/notas\", (err, res) => {",
+                  "  pm.collectionVariables.set(\"antes\", res.json().reduce((t, c) => t + c.notas.length, 0));",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Indica el dato que falla\", () => pm.expect(pm.response.json().error).to.be.a(\"string\").and.not.empty);",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaNueva\") + \"/notas\", (err, res) => {",
+                  "  const despues = res.json().reduce((t, c) => t + c.notas.length, 0);",
+                  "  pm.test(\"No modificación: las notas de la materia quedaron iguales\", () =>",
+                  "    pm.expect(despues).to.eql(Number(pm.collectionVariables.get(\"antes\"))));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-05 + CP-06 Corte al 80% + 30% (materia 3, POO)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/3/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "3",
+                "notas"
+              ]
+            },
+            "description": "CA-02.2, CA-02.3. Usa los datos de prueba: POO tiene el corte 1 en 80%.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corte\": 1,\n  \"descripcion\": \"Quiz extra\",\n  \"valor\": 3.0,\n  \"porcentaje\": 30\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaPOO\") + \"/notas\", (err, res) => {",
+                  "  pm.collectionVariables.set(\"antes\", res.json().reduce((t, c) => t + c.notas.length, 0));",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mensaje: Los porcentajes del corte no pueden superar el 100%. No se guardó.\", () => pm.expect(pm.response.json().error).to.eql(\"Los porcentajes del corte no pueden superar el 100%. No se guardó.\"));",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaPOO\") + \"/notas\", (err, res) => {",
+                  "  const despues = res.json().reduce((t, c) => t + c.notas.length, 0);",
+                  "  pm.test(\"No modificación: las notas de la materia quedaron iguales\", () =>",
+                  "    pm.expect(despues).to.eql(Number(pm.collectionVariables.get(\"antes\"))));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-07 Corte al 70% + 30% = 100% (materia 5, Bases de Datos)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/5/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "5",
+                "notas"
+              ]
+            },
+            "description": "Límite: llega justo a 100%. Ojo: modifica los datos; para repetirlo, reinicia el servicio.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corte\": 1,\n  \"descripcion\": \"Quiz\",\n  \"valor\": 4.0,\n  \"porcentaje\": 30\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-09 Registrar nota en materia inexistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/9999/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "9999",
+                "notas"
+              ]
+            },
+            "description": "RF-02.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corte\": 1,\n  \"descripcion\": \"Parcial\",\n  \"valor\": 3.0,\n  \"porcentaje\": 30\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Mensaje: La materia no existe.\", () => pm.expect(pm.response.json().error).to.eql(\"La materia no existe.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-10 Notas agrupadas por corte (materia 2, Álgebra)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/2/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "2",
+                "notas"
+              ]
+            },
+            "description": "CA-02.5. Álgebra tiene corte 1 al 100% y corte 2 al 60%."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const cortes = pm.response.json();",
+                  "pm.test(\"Viene agrupado en los cortes 1 y 2\", () => pm.expect(cortes.map(c => c.corte)).to.eql([1, 2]));",
+                  "pm.test(\"Porcentaje registrado por corte\", () => {",
+                  "  pm.expect(cortes[0].porcentajeRegistrado).to.eql(100);",
+                  "  pm.expect(cortes[1].porcentajeRegistrado).to.eql(60);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-29 La nota aparece solo en su materia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/1/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "1",
+                "notas"
+              ]
+            },
+            "description": "CA-02.4. La nota de CP-01 se registró en la materia nueva; la materia 1 (Cálculo Diferencial) sigue sin notas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"La materia 1 no tiene notas\", () => pm.expect(pm.response.json()).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-11 Consultar notas de materia inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/9999/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "9999",
+                "notas"
+              ]
+            },
+            "description": "CA-02.5."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Mensaje: La materia no existe.\", () => pm.expect(pm.response.json().error).to.eql(\"La materia no existe.\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RF-04 Estado",
+      "item": [
+        {
+          "name": "CP-15 Información incompleta (materia 2, corte 2 al 60%)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/2/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "2",
+                "estado"
+              ]
+            },
+            "description": "CA-04.1, 04.2, 04.4, 04.5."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const e = pm.response.json();",
+                  "pm.test(\"Estado INFORMACION_INCOMPLETA\", () => pm.expect(e.estado).to.eql(\"INFORMACION_INCOMPLETA\"));",
+                  "pm.test(\"No genera alerta\", () => pm.expect(e.alertaGenerada).to.eql(false));",
+                  "pm.test(\"CP-19: incluye el aviso de intraUAM\", () => pm.expect(e.aviso).to.eql(\"Este sistema no es la fuente oficial de notas. Verifica en intraUAM.\"));",
+                  "pm.test(\"Indica el corte y porcentaje faltante\", () => pm.expect(e.faltantes).to.deep.include({corte: 2, porcentajeRegistrado: 60}));",
+                  "pm.test(\"Mensaje del contrato\", () => pm.expect(e.mensaje).to.eql(\"Faltan notas del corte 2 (llevas 60% de 100%). Completa tus notas para calcular el estado.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-16 Materia sin notas (materia 1)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/1/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "1",
+                "estado"
+              ]
+            },
+            "description": "CA-04.1."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const e = pm.response.json();",
+                  "pm.test(\"Estado INFORMACION_INCOMPLETA\", () => pm.expect(e.estado).to.eql(\"INFORMACION_INCOMPLETA\"));",
+                  "pm.test(\"No genera alerta\", () => pm.expect(e.alertaGenerada).to.eql(false));",
+                  "pm.test(\"CP-19: incluye el aviso de intraUAM\", () => pm.expect(e.aviso).to.eql(\"Este sistema no es la fuente oficial de notas. Verifica en intraUAM.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-17 Información completa (materia 4)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/4/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "4",
+                "estado"
+              ]
+            },
+            "description": "CA-04.3."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const e = pm.response.json();",
+                  "pm.test(\"Estado COMPLETA\", () => pm.expect(e.estado).to.eql(\"COMPLETA\"));",
+                  "pm.test(\"No genera alerta\", () => pm.expect(e.alertaGenerada).to.eql(false));",
+                  "pm.test(\"CP-19: incluye el aviso de intraUAM\", () => pm.expect(e.aviso).to.eql(\"Este sistema no es la fuente oficial de notas. Verifica en intraUAM.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-18 (paso 1) Completar el corte 2 de la materia 2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/2/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "2",
+                "notas"
+              ]
+            },
+            "description": "Agrega 40% al corte 2 de Álgebra (60% + 40% = 100%). Modifica los datos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corte\": 2,\n  \"descripcion\": \"Proyecto 2\",\n  \"valor\": 3.5,\n  \"porcentaje\": 40\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-18 (paso 2) Ahora la materia 2 está completa",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/2/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "2",
+                "estado"
+              ]
+            },
+            "description": "CA-04.3, RNF-03."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const e = pm.response.json();",
+                  "pm.test(\"Estado COMPLETA\", () => pm.expect(e.estado).to.eql(\"COMPLETA\"));",
+                  "pm.test(\"No genera alerta\", () => pm.expect(e.alertaGenerada).to.eql(false));",
+                  "pm.test(\"CP-19: incluye el aviso de intraUAM\", () => pm.expect(e.aviso).to.eql(\"Este sistema no es la fuente oficial de notas. Verifica en intraUAM.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-20 Estado de materia inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/9999/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "9999",
+                "estado"
+              ]
+            },
+            "description": "RF-04."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Mensaje: La materia no existe.\", () => pm.expect(pm.response.json().error).to.eql(\"La materia no existe.\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
