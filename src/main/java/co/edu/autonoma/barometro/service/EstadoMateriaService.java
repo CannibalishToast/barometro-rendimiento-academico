@@ -6,12 +6,14 @@ import co.edu.autonoma.barometro.exception.RecursoNoEncontradoException;
 import co.edu.autonoma.barometro.exception.SinPermisoException;
 import co.edu.autonoma.barometro.model.Materia;
 import co.edu.autonoma.barometro.model.Nota;
+import co.edu.autonoma.barometro.repository.AlertaRepository;
 import co.edu.autonoma.barometro.repository.MateriaRepository;
 import co.edu.autonoma.barometro.repository.NotaRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -34,12 +36,17 @@ public class EstadoMateriaService {
     private static final double PORCENTAJE_COMPLETO = 100.0;
     private static final double TOLERANCIA = 0.000001;
 
+    private static final List<Integer> CORTES = List.of(1, 2, 3);
+
     private final MateriaRepository materiaRepository;
     private final NotaRepository notaRepository;
+    private final AlertaRepository alertaRepository;
 
-    public EstadoMateriaService(MateriaRepository materiaRepository, NotaRepository notaRepository) {
+    public EstadoMateriaService(MateriaRepository materiaRepository, NotaRepository notaRepository,
+                                AlertaRepository alertaRepository) {
         this.materiaRepository = materiaRepository;
         this.notaRepository = notaRepository;
+        this.alertaRepository = alertaRepository;
     }
 
     public EstadoMateriaResponse consultar(Long materiaId) {
@@ -63,9 +70,24 @@ public class EstadoMateriaService {
         }
 
         CalculadoraRiesgo.Resultado riesgo = CalculadoraRiesgo.calcular(notaDeCadaCorte(notasPorCorte));
+        boolean alertaGenerada = primerCorteSinNotas(notasPorCorte)
+                .map(corte -> alertaRepository.existePorMateriaYCorte(materiaId, corte))
+                .orElse(false);
         return new EstadoMateriaResponse(materiaId, COMPLETA, riesgo.nivelRiesgo(),
                 riesgo.notaAcumulada(), riesgo.porcentajeRestante(), riesgo.notaNecesaria(),
-                false, List.of(), "La información de la materia está completa.", AVISO);
+                alertaGenerada, List.of(), "La información de la materia está completa.", AVISO);
+    }
+
+    /**
+     * Corte en curso de la materia: el primero sin notas (contrato, esquema Alerta).
+     * Vacío si los tres cortes ya tienen notas.
+     */
+    public Optional<Integer> corteEnCurso(Long materiaId) {
+        return primerCorteSinNotas(notaRepository.listarPorMateriaAgrupadasPorCorte(materiaId));
+    }
+
+    private Optional<Integer> primerCorteSinNotas(Map<Integer, List<Nota>> notasPorCorte) {
+        return CORTES.stream().filter(corte -> !notasPorCorte.containsKey(corte)).findFirst();
     }
 
     // Con información incompleta los campos del riesgo van en null (RN-01)
