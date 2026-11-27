@@ -31,6 +31,27 @@ import java.util.List;
  *   <li><b>5 Bases de Datos:</b> corte 1 suma 70% (agregar 30% llega justo a 100%).</li>
  * </ul>
  *
+ * <p>Materias para el nivel de riesgo (SCRUM-65, RF-03). Tienen información completa
+ * y cada corte con notas lleva una sola nota de 100%, así que la nota del corte es esa
+ * nota. Los cortes pesan 30%, 35% y 35% (art. 37) y la nota necesaria se calcula hacia
+ * 2.95 (art. 39), según el documento de la fórmula de riesgo:</p>
+ * <ul>
+ *   <li><b>6 Física Mecánica</b> (3.0 · 2.5): nota necesaria 3.36, Despejado (ejemplo A).</li>
+ *   <li><b>7 Química General</b> (2.5 · 2.5): 3.79, Nublado (ejemplo B).</li>
+ *   <li><b>8 Estadística</b> (1.9 · 3.3): 3.5 en el límite, Despejado (con double da
+ *       3.5000000000000004; prueba la tolerancia).</li>
+ *   <li><b>9 Probabilidad</b> (0.5 · 3.5): 4.5 en el límite, Nublado (con double da
+ *       4.500000000000001).</li>
+ *   <li><b>10 Física Eléctrica</b> (0.5 · 3.0): 5.0, Tormenta.</li>
+ *   <li><b>11 Ecuaciones Diferenciales</b> (1.5 · 2.0): 5.14, Tormenta (aprobar ya no es posible).</li>
+ *   <li><b>12 Inglés I</b> (5.0 · 5.0): nota necesaria menor que 0, Despejado (ya aprobó).</li>
+ *   <li><b>13 Ética</b> (3.0 · 3.0 · 3.0): sin porcentaje pendiente, nota final 3.0, Despejado
+ *       (con double da 2.9999999999999996).</li>
+ *   <li><b>14 Contabilidad</b> (2.6 · 3.1 · 3.1): nota final 2.95, que redondea a 3.0, Despejado.</li>
+ *   <li><b>15 Economía</b> (2.8 · 3.0 · 3.0): nota final 2.94, que redondea a 2.9, Tormenta.</li>
+ *   <li><b>16 Sistemas Operativos</b> (2.9 · 2.9 · 2.9): nota final 2.9, Tormenta.</li>
+ * </ul>
+ *
  * <p>Para desactivar la carga (por ejemplo, en pruebas de Backend que necesiten
  * empezar vacías) se usa la propiedad {@code barometro.datos-prueba.habilitados=false}.
  * Si no se define, los datos se cargan.</p>
@@ -96,6 +117,33 @@ public class DatosDePrueba implements CommandLineRunner {
         // Bases de Datos: corte 1 suma 70%.
         nota(bases, 1, "Parcial", 3.8, 40.0);
         nota(bases, 1, "Taller", 4.2, 30.0);
+
+        cargarMateriasDeRiesgo();
+    }
+
+    /** Una materia por cada caso del documento de la fórmula de riesgo (SCRUM-65, RF-03). */
+    private void cargarMateriasDeRiesgo() {
+        materiaConCortes("Física Mecánica", "D-101", 3.0, 2.5);
+        materiaConCortes("Química General", "D-102", 2.5, 2.5);
+        materiaConCortes("Estadística", "D-103", 1.9, 3.3);
+        materiaConCortes("Probabilidad", "D-104", 0.5, 3.5);
+        materiaConCortes("Física Eléctrica", "D-105", 0.5, 3.0);
+        materiaConCortes("Ecuaciones Diferenciales", "D-106", 1.5, 2.0);
+        materiaConCortes("Inglés I", "D-107", 5.0, 5.0);
+        materiaConCortes("Ética", "D-108", 3.0, 3.0, 3.0);
+        materiaConCortes("Contabilidad", "D-109", 2.6, 3.1, 3.1);
+        materiaConCortes("Economía", "D-110", 2.8, 3.0, 3.0);
+        materiaConCortes("Sistemas Operativos", "D-111", 2.9, 2.9, 2.9);
+    }
+
+    /** Materia con una nota de 100% en cada corte, en orden (corte 1, 2 y 3). */
+    private void materiaConCortes(String nombre, String salon, double... notaDeCadaCorte) {
+        Materia materia = materia(nombre, "Docente de ejemplo", List.of("SABADO"),
+                "08:00", "10:00", salon);
+        for (int i = 0; i < notaDeCadaCorte.length; i++) {
+            int corte = i + 1;
+            nota(materia, corte, "Definitiva del corte " + corte, notaDeCadaCorte[i], 100.0);
+        }
     }
 
     private Materia materia(String nombre, String docente, List<String> dias,
