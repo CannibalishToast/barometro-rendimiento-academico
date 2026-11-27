@@ -3,6 +3,7 @@ package co.edu.autonoma.barometro.controller;
 import co.edu.autonoma.barometro.dto.CorteFaltante;
 import co.edu.autonoma.barometro.dto.EstadoMateriaResponse;
 import co.edu.autonoma.barometro.exception.RecursoNoEncontradoException;
+import co.edu.autonoma.barometro.service.CalculadoraRiesgo;
 import co.edu.autonoma.barometro.service.EstadoMateriaService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +48,25 @@ class EstadoMateriaControllerTest {
                 .andExpect(jsonPath("$.faltantes[0].porcentajeRegistrado").value(60.0))
                 .andExpect(jsonPath("$.aviso")
                         .value("Este sistema no es la fuente oficial de notas. Verifica en intraUAM."));
+    }
+    
+    @Test
+    void estadoCompletoResponde200ConElNivelDeRiesgo() throws Exception {
+        EstadoMateriaResponse completa = new EstadoMateriaResponse(2L,
+                EstadoMateriaService.COMPLETA, CalculadoraRiesgo.DESPEJADO, 1.775, 35.0, 3.36,
+                false, List.of(), "La información de la materia está completa.",
+                EstadoMateriaService.AVISO);
+        when(estadoMateriaService.consultar(2L)).thenReturn(completa);
+
+        mockMvc.perform(get(URL))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("COMPLETA"))
+                .andExpect(jsonPath("$.nivelRiesgo").value("DESPEJADO"))
+                .andExpect(jsonPath("$.notaAcumulada").value(1.775))
+                .andExpect(jsonPath("$.porcentajeRestante").value(35.0))
+                .andExpect(jsonPath("$.notaNecesaria").value(3.36))
+                .andExpect(jsonPath("$.alertaGenerada").value(false))
+                .andExpect(jsonPath("$.faltantes").isEmpty());
     }
 
     @Test
