@@ -15,7 +15,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Decide si una materia tiene la información completa para calcular su estado (RF-04).
+ * Decide si una materia tiene la información completa (RF-04) y, si la tiene,
+ * calcula su nivel de riesgo con la fórmula del documento (RF-03).
  *
  * <p>Regla: cada corte con notas debe sumar 100%; un corte sin notas se ignora y una
  * materia sin ninguna nota está incompleta. Con información incompleta no se calcula
@@ -48,9 +49,8 @@ public class EstadoMateriaService {
                 notaRepository.listarPorMateriaAgrupadasPorCorte(materiaId);
 
         if (notasPorCorte.isEmpty()) {
-            return new EstadoMateriaResponse(materiaId, INCOMPLETA, false, List.of(),
-                    "Aún no tienes notas en esta materia. Completa tus notas para calcular el estado.",
-                    AVISO);
+            return incompleta(materiaId, List.of(),
+                    "Aún no tienes notas en esta materia. Completa tus notas para calcular el estado.");
         }
 
         List<CorteFaltante> faltantes = notasPorCorte.keySet().stream()
@@ -58,13 +58,29 @@ public class EstadoMateriaService {
                 .filter(corte -> corte.porcentajeRegistrado() < PORCENTAJE_COMPLETO - TOLERANCIA)
                 .toList();
 
-        if (faltantes.isEmpty()) {
-            return new EstadoMateriaResponse(materiaId, COMPLETA, false, List.of(),
-                    "La información de la materia está completa.", AVISO);
+        if (!faltantes.isEmpty()) {
+            return incompleta(materiaId, faltantes, mensajeDeFaltantes(faltantes));
         }
 
-        return new EstadoMateriaResponse(materiaId, INCOMPLETA, false, faltantes,
-                mensajeDeFaltantes(faltantes), AVISO);
+        CalculadoraRiesgo.Resultado riesgo = CalculadoraRiesgo.calcular(notaDeCadaCorte(notasPorCorte));
+        return new EstadoMateriaResponse(materiaId, COMPLETA, riesgo.nivelRiesgo(),
+                riesgo.notaAcumulada(), riesgo.porcentajeRestante(), riesgo.notaNecesaria(),
+                false, List.of(), "La información de la materia está completa.", AVISO);
+    }
+
+    // Con información incompleta los campos del riesgo van en null (RN-01)
+    private EstadoMateriaResponse incompleta(Long materiaId, List<CorteFaltante> faltantes, String mensaje) {
+        return new EstadoMateriaResponse(materiaId, INCOMPLETA, null, null, null, null,
+                false, faltantes, mensaje, AVISO);
+    }
+
+    // Nota de cada corte sin redondear: suma de (nota × porcentaje / 100). La calculadora la redondea.
+    private Map<Integer, Double> notaDeCadaCorte(Map<Integer, List<Nota>> notasPorCorte) {
+        return notasPorCorte.entrySet().stream().collect(Collectors.toMap(
+                Map.Entry::getKey,
+                grupo -> grupo.getValue().stream()
+                        .mapToDouble(nota -> nota.getValor() * nota.getPorcentaje() / 100)
+                        .sum()));
     }
 
     private void verificarAcceso(Long materiaId, String mensajeSinPermiso) {

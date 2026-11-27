@@ -31,7 +31,10 @@ class EstadoMateriaControllerTest {
     @Test
     void estadoIncompletoResponde200ConLoQueFalta() throws Exception {
         EstadoMateriaResponse incompleta = new EstadoMateriaResponse(2L,
-                EstadoMateriaService.INCOMPLETA, false, List.of(new CorteFaltante(2, 60.0)),
+        // los 4 null son nivelRiesgo, notaAcumulada, porcentajeRestante y notaNecesaria respectivamente, tienen el mismo orden del record
+        // Y son nulos porque esta es una prueba de materia incompleta, por lo que no se calcula el riesgo ni se genera alerta
+                EstadoMateriaService.INCOMPLETA, null, null, null, null,
+                false, List.of(new CorteFaltante(2, 60.0)),
                 "Faltan notas del corte 2 (llevas 60% de 100%). Completa tus notas para calcular el estado.",
                 EstadoMateriaService.AVISO);
         when(estadoMateriaService.consultar(2L)).thenReturn(incompleta);
