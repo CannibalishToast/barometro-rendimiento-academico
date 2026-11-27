@@ -3,14 +3,19 @@ package co.edu.autonoma.barometro.dto;
 import java.util.List;
 
 /**
- * Estado de la información de una materia (esquema EstadoMateria del contrato, RF-04).
+ * Estado de la información de una materia y su nivel de riesgo (esquema EstadoMateria
+ * del contrato, RF-03 y RF-04).
  *
- * <p>Mientras falten notas no se calcula riesgo ni se genera alerta, por eso
- * alertaGenerada es false (RN-01, RNF-03). El aviso de RN-03 va en toda respuesta.
+ * <p>Con información incompleta no se calcula riesgo ni se genera alerta, por eso los
+ * campos del riesgo van en null (RN-01, RNF-03). El aviso de RN-03 va en toda respuesta.
  */
 public record EstadoMateriaResponse(
         Long materiaId,
         String estado,
+        String nivelRiesgo,
+        Double notaAcumulada,
+        Double porcentajeRestante,
+        Double notaNecesaria,
         Boolean alertaGenerada,
         List<CorteFaltante> faltantes,
         String mensaje,

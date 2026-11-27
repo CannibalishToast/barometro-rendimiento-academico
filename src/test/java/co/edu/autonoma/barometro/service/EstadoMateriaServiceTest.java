@@ -16,6 +16,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -45,6 +46,11 @@ class EstadoMateriaServiceTest {
     // Guarda una nota de 4.0 en el corte y con el porcentaje indicados
     private void nota(int corte, double porcentaje) {
         notaRepository.guardar(new Nota(null, materiaId, corte, "Parcial", 4.0, porcentaje, null));
+    }
+    
+    // Guarda una nota con el valor, el corte y el porcentaje indicados
+    private void nota(int corte, double valor, double porcentaje) {
+        notaRepository.guardar(new Nota(null, materiaId, corte, "Parcial", valor, porcentaje, null));
     }
 
     @Test
@@ -103,6 +109,35 @@ class EstadoMateriaServiceTest {
         assertEquals(2, estado.faltantes().size());
         assertEquals("Faltan notas del corte 1 (llevas 50% de 100%) y del corte 2 "
                 + "(llevas 62.5% de 100%). Completa tus notas para calcular el estado.", estado.mensaje());
+    }
+
+    @Test
+    void materiaCompletaCalculaElRiesgoConLasNotasDeCadaCorte() {
+        nota(1, 3.5, 60);
+        nota(1, 2.25, 40);
+        nota(2, 2.5, 100);
+
+        EstadoMateriaResponse estado = service.consultar(materiaId);
+
+        assertEquals(EstadoMateriaService.COMPLETA, estado.estado());
+        assertEquals(1.775, estado.notaAcumulada(), 0.000001);
+        assertEquals(35.0, estado.porcentajeRestante(), 0.000001);
+        assertEquals(3.36, estado.notaNecesaria(), 0.000001);
+        assertEquals(CalculadoraRiesgo.DESPEJADO, estado.nivelRiesgo());
+        assertFalse(estado.alertaGenerada());
+    }
+
+    @Test
+    void materiaIncompletaNoCalculaRiesgo() {
+        nota(1, 2.0, 60);
+
+        EstadoMateriaResponse estado = service.consultar(materiaId);
+
+        assertEquals(EstadoMateriaService.INCOMPLETA, estado.estado());
+        assertNull(estado.nivelRiesgo());
+        assertNull(estado.notaAcumulada());
+        assertNull(estado.porcentajeRestante());
+        assertNull(estado.notaNecesaria());
     }
 
     @Test
