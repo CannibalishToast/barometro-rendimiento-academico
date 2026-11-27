@@ -1,11 +1,14 @@
 openapi: 3.0.3
 info:
   title: Alerta Temprana de Rendimiento Académico – API
-  version: 0.1.0
+  version: 0.3.0
   description: >
-    Contrato REST inicial del Sprint 1 (EQUIPO-5). Basado en SCRUM-7 (RF-01, RF-02)
-    y SCRUM-14 (RF-04). Sin autenticación todavía: se usa un estudiante de prueba fijo
-    y los datos van en memoria.
+    Contrato REST de EQUIPO-5. Sprint 1 y 2: RF-01, RF-02 y RF-04 (SCRUM-7, SCRUM-14).
+    Sprint 3 (SCRUM-62): RF-03 riesgo, RF-05 alertas y pronóstico, RN-02 tutoría desde la
+    alerta, RF-06 y RF-07 tutorías y RF-08 evolución del promedio. Sin autenticación todavía:
+    se usa un estudiante de prueba fijo y los datos van en memoria. Las reglas de cálculo
+    siguen el Reglamento General Estudiantil de la UAM (Acuerdo 001 de 2026, arts. 37, 39 y 42)
+    y el documento de la fórmula de riesgo.
 servers:
   - url: http://localhost:8080
 tags:
@@ -14,7 +17,13 @@ tags:
   - name: Notas
     description: RF-02 Registrar notas por corte en cada materia
   - name: Estado
-    description: RF-04 Identificar información incompleta y evitar alertas incorrectas
+    description: RF-03 Nivel de riesgo y RF-04 Identificar información incompleta
+  - name: Alertas
+    description: RF-05 Pronóstico general y alertas de riesgo, con opción de tutoría (RN-02)
+  - name: Tutorias
+    description: RF-06 Solicitar tutorías y RF-07 Consultar su historial y estado
+  - name: Evolucion
+    description: RF-08 Evolución del promedio por corte
 
 paths:
   /api/materias:
@@ -61,6 +70,10 @@ paths:
     post:
       tags: [Notas]
       summary: Registrar una nota en un corte (RF-02, CA-02.1 a CA-02.4, CA-02.6)
+      description: >
+        Después de guardar la nota se recalcula el riesgo de la materia. Si queda en Nublado
+        o Tormenta con información completa y no existe alerta para el corte en curso, se
+        crea una alerta (RF-05). La respuesta de la nota no cambia.
       requestBody:
         required: true
         content:
@@ -109,12 +122,16 @@ paths:
       - $ref: '#/components/parameters/MateriaId'
     get:
       tags: [Estado]
-      summary: Consultar si la materia tiene información completa (RF-04, CA-04.1 a CA-04.7)
+      summary: Consultar si la materia tiene información completa y su nivel de riesgo (RF-03, RF-04)
       description: >
-        Regla propuesta, pendiente de confirmar por Producto: una materia tiene información
-        completa cuando, en cada corte con notas, los porcentajes suman 100%. Con información
-        incompleta no se calcula riesgo ni se genera alerta (RN-01, RNF-03). El nivel
-        Despejado / Nublado / Tormenta se agrega con RF-03.
+        Una materia tiene información completa cuando cada corte con notas suma 100%; un corte
+        sin notas se ignora y una materia sin notas está incompleta (RF-04). Con información
+        incompleta no se calcula riesgo ni se genera alerta (RN-01, RNF-03). Con información
+        completa se calcula el nivel Despejado, Nublado o Tormenta según la nota necesaria
+        para aprobar, con cortes de 30%, 35% y 35% (RF-03, documento de la fórmula).
+        Según el Reglamento General Estudiantil de la UAM (Acuerdo 001 de 2026, art. 39), la
+        nota de cada corte y la definitiva se redondean a un decimal y se aprueba con 3.0;
+        por eso la nota necesaria se calcula hacia 2.95, que ya redondea a 3.0.
       responses:
         '200':
           description: Estado de la información de la materia
@@ -134,12 +151,115 @@ paths:
                   value:
                     materiaId: 1
                     estado: COMPLETA
+                    nivelRiesgo: DESPEJADO
+                    notaAcumulada: 1.775
+                    porcentajeRestante: 35
+                    notaNecesaria: 3.36
                     alertaGenerada: false
                     faltantes: []
                     mensaje: La información de la materia está completa.
                     aviso: Este sistema no es la fuente oficial de notas. Verifica en intraUAM.
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/MateriaNoExiste' }
+
+  /api/materias/{materiaId}/evolucion:
+    parameters:
+      - $ref: '#/components/parameters/MateriaId'
+    get:
+      tags: [Evolucion]
+      summary: Consultar la evolución del promedio de la materia por corte (RF-08)
+      description: >
+        Muestra, corte por corte, la nota del corte y el promedio de la materia hasta ese
+        momento. Solo entran los cortes completos (RF-04). El promedio no se aproxima a un
+        decimal porque el art. 39, parágrafo 1, excluye los promedios; se muestra con 2 decimales.
+      responses:
+        '200':
+          description: Evolución del promedio
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvolucionPromedio' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/MateriaNoExiste' }
+
+  /api/alertas:
+    get:
+      tags: [Alertas]
+      summary: Consultar las alertas de riesgo del estudiante (RF-05, RN-02)
+      description: >
+        Una alerta se crea al registrar una nota, si la materia queda en Nublado o Tormenta
+        con información completa (RN-01). Hay como máximo una alerta por materia y corte.
+        Toda alerta trae la opción de pedir tutoría (RN-02) y el aviso de fuente no oficial.
+      responses:
+        '200':
+          description: Alertas del estudiante, de la más reciente a la más antigua
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Alerta' }
+
+  /api/pronostico:
+    get:
+      tags: [Alertas]
+      summary: Consultar el pronóstico general de todas las materias (RF-05, CA-05.1)
+      responses:
+        '200':
+          description: Riesgo de cada materia y resumen
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pronostico' }
+
+  /api/tutorias:
+    post:
+      tags: [Tutorias]
+      summary: Solicitar una tutoría para una materia, desde una alerta o directamente (RF-06)
+      description: >
+        La tutoría nace en estado SOLICITADA. Si viene de una alerta, se guarda su id para
+        saber qué alerta la originó (RN-02). Los demás estados (CONFIRMADA, CANCELADA,
+        REALIZADA) los asigna el tutor cuando exista su rol.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TutoriaEntrada' }
+            example: { materiaId: 2, alertaId: 1, motivo: Necesito repasar matrices para el corte 3 }
+      responses:
+        '201':
+          description: Tutoría solicitada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tutoria' }
+        '400':
+          description: Dato faltante o inválido; no se guarda nada (RNF-04).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                faltaMotivo:
+                  value: { error: Falta el motivo de la tutoría. }
+                faltaMateria:
+                  value: { error: Falta la materia de la tutoría. }
+                alertaDeOtraMateria:
+                  value: { error: La alerta no corresponde a esa materia. }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/MateriaNoExiste' }
+    get:
+      tags: [Tutorias]
+      summary: Consultar el historial de tutorías y su estado (RF-07)
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          description: Filtra por estado. Sin este parámetro trae todas.
+          schema: { type: string, enum: [SOLICITADA, CONFIRMADA, CANCELADA, REALIZADA] }
+      responses:
+        '200':
+          description: Tutorías del estudiante, de la más reciente a la más antigua
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Tutoria' }
 
 components:
   parameters:
@@ -158,8 +278,8 @@ components:
           example: { error: La materia no existe. }
     SinPermiso:
       description: >
-        Solo el estudiante dueño de la materia (RN-04, RNF-02). Se implementa cuando exista
-        autenticación.
+        Solo el estudiante dueño de la materia (RN-04, RNF-02). Implementado en SCRUM-60 con el
+        estudiante de prueba; cuando exista autenticación se usará el estudiante que inició sesión.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -224,7 +344,11 @@ components:
       properties:
         materiaId: { type: integer, format: int64 }
         estado: { type: string, enum: [INFORMACION_INCOMPLETA, COMPLETA] }
-        alertaGenerada: { type: boolean }
+        alertaGenerada:
+          type: boolean
+          description: >
+            true si la materia tiene una alerta para el corte en curso (RF-05). Siempre es
+            false con información incompleta (RN-01).
         faltantes:
           type: array
           items:
@@ -234,6 +358,158 @@ components:
               porcentajeRegistrado: { type: number }
         mensaje: { type: string }
         aviso: { type: string }
+        nivelRiesgo:
+          type: string
+          enum: [DESPEJADO, NUBLADO, TORMENTA]
+          nullable: true
+          description: Riesgo de la materia (RF-03). Es null si la información está incompleta (RN-01).
+        notaAcumulada:
+          type: number
+          nullable: true
+          description: >
+            Puntos que ya aportan los cortes completos a la nota final (Nₐ). Cada nota de
+            corte se redondea a un decimal antes de aplicar su peso (art. 39 del reglamento).
+        porcentajeRestante:
+          type: number
+          nullable: true
+          description: Peso de los cortes que aún no tienen notas (Pᵣ).
+        notaNecesaria:
+          type: number
+          nullable: true
+          description: >
+            Promedio necesario en lo que falta para aprobar, calculado hacia 2.95 porque la
+            nota definitiva se redondea a un decimal y 2.95 ya es 3.0 (art. 39 del reglamento).
+            Se muestra con 2 decimales; la clasificación usa el valor sin redondear. Es null si
+            ya no queda nada por evaluar.
+
+    Alerta:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        materiaId: { type: integer, format: int64 }
+        materia: { type: string, description: Nombre de la materia (CA-05.4) }
+        corte: { type: integer, enum: [1, 2, 3], description: Corte en curso, el primero sin notas }
+        nivelRiesgo: { type: string, enum: [NUBLADO, TORMENTA] }
+        notaNecesaria: { type: number, description: Con 2 decimales }
+        fechaGeneracion: { type: string, format: date-time, description: Cuándo se creó (CA-05.8) }
+        fechaCierreCorte: { type: string, format: date, description: Cierre del corte en curso según el calendario académico (art. 42) }
+        diasParaCierre:
+          type: integer
+          description: >
+            Días que faltan para el cierre del corte. La alerta busca salir con 14 o más
+            (CA-05.3); si sale con menos, igual se genera y muestra los días que quedan.
+        mensaje: { type: string }
+        tutoria: { $ref: '#/components/schemas/OpcionTutoria' }
+        aviso: { type: string, description: Aviso de fuente no oficial (CA-05.6) }
+      example:
+        id: 1
+        materiaId: 2
+        materia: Álgebra Lineal
+        corte: 3
+        nivelRiesgo: NUBLADO
+        notaNecesaria: 3.79
+        fechaGeneracion: '2026-11-10T09:30:00'
+        fechaCierreCorte: '2026-11-28'
+        diasParaCierre: 18
+        mensaje: Necesitas 3.79 en el corte 3 para aprobar Álgebra Lineal.
+        tutoria: { disponible: true, solicitarEn: /api/tutorias }
+        aviso: Este sistema no es la fuente oficial de notas. Verifica en intraUAM.
+
+    OpcionTutoria:
+      type: object
+      description: Opción de pedir tutoría desde la alerta (RN-02)
+      properties:
+        disponible: { type: boolean }
+        solicitarEn: { type: string, description: Dirección para pedir la tutoría (RF-06) }
+
+    Pronostico:
+      type: object
+      properties:
+        materias:
+          type: array
+          items:
+            type: object
+            properties:
+              materiaId: { type: integer, format: int64 }
+              materia: { type: string }
+              estado: { type: string, enum: [INFORMACION_INCOMPLETA, COMPLETA] }
+              nivelRiesgo: { type: string, enum: [DESPEJADO, NUBLADO, TORMENTA], nullable: true }
+              notaNecesaria: { type: number, nullable: true }
+        resumen:
+          type: object
+          properties:
+            despejado: { type: integer }
+            nublado: { type: integer }
+            tormenta: { type: integer }
+            incompletas: { type: integer }
+        aviso: { type: string }
+      example:
+        materias:
+          - { materiaId: 1, materia: Cálculo Diferencial, estado: INFORMACION_INCOMPLETA, nivelRiesgo: null, notaNecesaria: null }
+          - { materiaId: 2, materia: Álgebra Lineal, estado: COMPLETA, nivelRiesgo: NUBLADO, notaNecesaria: 3.79 }
+        resumen: { despejado: 0, nublado: 1, tormenta: 0, incompletas: 1 }
+        aviso: Este sistema no es la fuente oficial de notas. Verifica en intraUAM.
+
+    TutoriaEntrada:
+      type: object
+      required: [materiaId, motivo]
+      properties:
+        materiaId: { type: integer, format: int64 }
+        alertaId:
+          type: integer
+          format: int64
+          nullable: true
+          description: Alerta desde la que se pide (RN-02). Debe ser de la misma materia.
+        motivo: { type: string, description: Qué necesita repasar el estudiante }
+
+    Tutoria:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        materiaId: { type: integer, format: int64 }
+        materia: { type: string }
+        alertaId: { type: integer, format: int64, nullable: true }
+        motivo: { type: string }
+        estado:
+          type: string
+          enum: [SOLICITADA, CONFIRMADA, CANCELADA, REALIZADA]
+          description: Nace en SOLICITADA (documento de la fórmula, sección 2)
+        fechaSolicitud: { type: string, format: date-time }
+      example:
+        id: 1
+        materiaId: 2
+        materia: Álgebra Lineal
+        alertaId: 1
+        motivo: Necesito repasar matrices para el corte 3
+        estado: SOLICITADA
+        fechaSolicitud: '2026-11-10T10:00:00'
+
+    EvolucionPromedio:
+      type: object
+      properties:
+        materiaId: { type: integer, format: int64 }
+        materia: { type: string }
+        cortes:
+          type: array
+          items:
+            type: object
+            properties:
+              corte: { type: integer, enum: [1, 2, 3] }
+              peso: { type: number, description: 30, 35 o 35 (art. 37) }
+              nota: { type: number, description: Nota del corte redondeada a un decimal (art. 39) }
+              promedioHastaAqui:
+                type: number
+                description: >
+                  Promedio ponderado de los cortes completos hasta este, con 2 decimales.
+                  No se aproxima a un decimal (art. 39, parágrafo 1).
+        aviso: { type: string }
+      example:
+        materiaId: 2
+        materia: Álgebra Lineal
+        cortes:
+          - { corte: 1, peso: 30, nota: 2.5, promedioHastaAqui: 2.5 }
+          - { corte: 2, peso: 35, nota: 2.5, promedioHastaAqui: 2.5 }
+        aviso: Este sistema no es la fuente oficial de notas. Verifica en intraUAM.
 
     Error:
       type: object
