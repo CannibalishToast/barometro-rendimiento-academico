@@ -6,6 +6,7 @@ import co.edu.autonoma.barometro.exception.RecursoNoEncontradoException;
 import co.edu.autonoma.barometro.exception.SinPermisoException;
 import co.edu.autonoma.barometro.model.Materia;
 import co.edu.autonoma.barometro.model.Nota;
+import co.edu.autonoma.barometro.repository.AlertaRepository;
 import co.edu.autonoma.barometro.repository.MateriaRepository;
 import co.edu.autonoma.barometro.repository.NotaRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +33,7 @@ class EstadoMateriaServiceTest {
     void preparar() {
         MateriaRepository materiaRepository = new MateriaRepository();
         notaRepository = new NotaRepository();
-        service = new EstadoMateriaService(materiaRepository, notaRepository);
+        service = new EstadoMateriaService(materiaRepository, notaRepository, new AlertaRepository());
 
         Materia materia = materiaRepository.guardar(new Materia(null, 1L, "Álgebra", "Profe Gómez",
                 List.of("Lunes"), LocalTime.of(8, 0), LocalTime.of(10, 0), "Salón 204"));

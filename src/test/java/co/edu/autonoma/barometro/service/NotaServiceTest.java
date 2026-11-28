@@ -7,11 +7,14 @@ import co.edu.autonoma.barometro.exception.RecursoNoEncontradoException;
 import co.edu.autonoma.barometro.exception.ReglaDeNegocioException;
 import co.edu.autonoma.barometro.exception.SinPermisoException;
 import co.edu.autonoma.barometro.model.Materia;
+import co.edu.autonoma.barometro.repository.AlertaRepository;
+import co.edu.autonoma.barometro.repository.CalendarioAcademico;
 import co.edu.autonoma.barometro.repository.MateriaRepository;
 import co.edu.autonoma.barometro.repository.NotaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -33,7 +36,13 @@ class NotaServiceTest {
     void preparar() {
         MateriaRepository materiaRepository = new MateriaRepository();
         notaRepository = new NotaRepository();
-        service = new NotaService(materiaRepository, notaRepository);
+        AlertaRepository alertaRepository = new AlertaRepository();
+        EstadoMateriaService estadoMateriaService =
+                new EstadoMateriaService(materiaRepository, notaRepository, alertaRepository);
+        AlertaService alertaService = new AlertaService(estadoMateriaService, materiaRepository,
+                alertaRepository, new CalendarioAcademico("2026-09-05", "2026-10-17", "2026-11-28"),
+                Clock.systemDefaultZone());
+        service = new NotaService(materiaRepository, notaRepository, alertaService);
 
         Materia materia = materiaRepository.guardar(new Materia(null, 1L, "Cálculo", "Profe Gómez",
                 List.of("Lunes"), LocalTime.of(8, 0), LocalTime.of(10, 0), "Salón 204"));
