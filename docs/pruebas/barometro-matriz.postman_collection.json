@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "17590575-f9cf-43b1-a67d-4ce12f45e763",
     "name": "Barómetro – Matriz de pruebas (SCRUM-9)",
-    "description": "Casos de la matriz de pruebas (docs/matriz-pruebas.md) contra la API. Correr en orden con el servicio recién iniciado (datos de prueba de SCRUM-38 y SCRUM-65). Orden: RF-01, RF-02, RF-03 y RF-04. RF-03 usa las materias 6 a 16 de SCRUM-65.",
+    "description": "Casos de la matriz de pruebas (docs/matriz-pruebas.md) contra la API. Correr en orden con el servicio recién iniciado (datos de prueba de SCRUM-38 y SCRUM-65). Orden: RF-01, RF-02, RF-03, RF-04 y RF-05. RF-03 usa las materias 6 a 16 de SCRUM-65.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -20,6 +20,22 @@
     },
     {
       "key": "antes",
+      "value": ""
+    },
+    {
+      "key": "materiaAlerta",
+      "value": ""
+    },
+    {
+      "key": "materiaNublado",
+      "value": ""
+    },
+    {
+      "key": "materiaIncompleta",
+      "value": ""
+    },
+    {
+      "key": "alertaTormenta",
       "value": ""
     }
   ],
@@ -1852,6 +1868,555 @@
                 "exec": [
                   "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
                   "pm.test(\"Mensaje: La materia no existe.\", () => pm.expect(pm.response.json().error).to.eql(\"La materia no existe.\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RF-05 Alertas",
+      "item": [
+        {
+          "name": "CP-46 Pronóstico general",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pronostico",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pronostico"
+              ]
+            },
+            "description": "CA-05.1. Cada materia con su estado, nivel y nota necesaria; resumen coherente con la lista."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "const porId = id => p.materias.find(m => m.materiaId === id);",
+                  "pm.test(\"Incluye las materias de prueba con su nivel (fórmula de RF-03)\", () => {",
+                  "  pm.expect(porId(6).nivelRiesgo).to.eql(\"DESPEJADO\");",
+                  "  pm.expect(porId(7).nivelRiesgo).to.eql(\"NUBLADO\");",
+                  "  pm.expect(porId(7).notaNecesaria).to.be.closeTo(3.79, 0.0001);",
+                  "  pm.expect(porId(10).nivelRiesgo).to.eql(\"TORMENTA\");",
+                  "  pm.expect(porId(16).nivelRiesgo).to.eql(\"TORMENTA\");",
+                  "});",
+                  "pm.test(\"Materia incompleta sin nivel ni nota necesaria (RN-01)\", () => {",
+                  "  pm.expect(porId(1).estado).to.eql(\"INFORMACION_INCOMPLETA\");",
+                  "  pm.expect(porId(1).nivelRiesgo).to.eql(null);",
+                  "  pm.expect(porId(1).notaNecesaria).to.eql(null);",
+                  "});",
+                  "pm.test(\"El resumen cuadra con la lista\", () => {",
+                  "  const contar = f => p.materias.filter(f).length;",
+                  "  pm.expect(p.resumen.despejado).to.eql(contar(m => m.nivelRiesgo === \"DESPEJADO\"));",
+                  "  pm.expect(p.resumen.nublado).to.eql(contar(m => m.nivelRiesgo === \"NUBLADO\"));",
+                  "  pm.expect(p.resumen.tormenta).to.eql(contar(m => m.nivelRiesgo === \"TORMENTA\"));",
+                  "  pm.expect(p.resumen.incompletas).to.eql(contar(m => m.estado === \"INFORMACION_INCOMPLETA\"));",
+                  "  pm.expect(p.resumen.despejado + p.resumen.nublado + p.resumen.tormenta + p.resumen.incompletas).to.eql(p.materias.length);",
+                  "});",
+                  "pm.test(\"Incluye el aviso de intraUAM\", () => pm.expect(p.aviso).to.eql(\"Este sistema no es la fuente oficial de notas. Verifica en intraUAM.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-47 (paso 1) Crear materia «Alertas QA Tormenta»",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias"
+              ]
+            },
+            "description": "Crea una materia sin notas para CP-47; guarda su id en materiaAlerta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Alertas QA Tormenta\",\n  \"docente\": \"Docente de prueba QA\",\n  \"horario\": {\n    \"dias\": [\n      \"VIERNES\"\n    ],\n    \"horaInicio\": \"14:00\",\n    \"horaFin\": \"16:00\"\n  },\n  \"salon\": \"E-301\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"materiaAlerta\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-47 (paso 2) Corte 1 en 3.0: Despejado, sin alerta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/{{materiaAlerta}}/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "{{materiaAlerta}}",
+                "notas"
+              ]
+            },
+            "description": "CA-05.2, activa CP-D4. Na 0.9, Pr 70, nota necesaria 2.93 → Despejado: no se crea alerta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corte\": 1,\n  \"descripcion\": \"Definitiva corte 1\",\n  \"valor\": 3.0,\n  \"porcentaje\": 100\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaAlerta\") + \"/estado\", (err, res) => {",
+                  "  const e = res.json();",
+                  "  pm.test(\"Queda DESPEJADO con nota necesaria 2.93\", () => {",
+                  "    pm.expect(e.nivelRiesgo).to.eql(\"DESPEJADO\");",
+                  "    pm.expect(e.notaNecesaria).to.be.closeTo(2.93, 0.0001);",
+                  "  });",
+                  "  pm.test(\"Despejado no genera alerta (estado)\", () => pm.expect(e.alertaGenerada).to.eql(false));",
+                  "});",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/alertas\", (err, res) => {",
+                  "  const propias = res.json().filter(a => a.materiaId === Number(pm.collectionVariables.get(\"materiaAlerta\")));",
+                  "  pm.test(\"Despejado no genera alerta (lista de alertas)\", () => pm.expect(propias.length).to.eql(0));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-48 Corte 2 en 0.5: Tormenta, genera alerta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/{{materiaAlerta}}/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "{{materiaAlerta}}",
+                "notas"
+              ]
+            },
+            "description": "CA-05.2, activa CP-D3. Na 1.075, Pr 35, nota necesaria 5.36 → Tormenta: se crea la alerta del corte en curso (3).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corte\": 2,\n  \"descripcion\": \"Definitiva corte 2\",\n  \"valor\": 0.5,\n  \"porcentaje\": 100\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaAlerta\") + \"/estado\", (err, res) => {",
+                  "  const e = res.json();",
+                  "  pm.test(\"Queda TORMENTA con nota necesaria 5.36\", () => {",
+                  "    pm.expect(e.nivelRiesgo).to.eql(\"TORMENTA\");",
+                  "    pm.expect(e.notaNecesaria).to.be.closeTo(5.36, 0.0001);",
+                  "  });",
+                  "  pm.test(\"El estado indica alerta generada\", () => pm.expect(e.alertaGenerada).to.eql(true));",
+                  "});",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/alertas\", (err, res) => {",
+                  "  const propias = res.json().filter(a => a.materiaId === Number(pm.collectionVariables.get(\"materiaAlerta\")));",
+                  "  pm.test(\"Se creó exactamente una alerta\", () => pm.expect(propias.length).to.eql(1));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-49 Contenido de la alerta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/alertas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "alertas"
+              ]
+            },
+            "description": "CA-05.3, 05.4, 05.5, 05.6, 05.8, RN-02, RN-03. Revisa la alerta de CP-48."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const diasEntre = (desde, hasta) => Math.round((Date.parse(hasta) - Date.parse(desde)) / 86400000);",
+                  "const a = pm.response.json().find(x => x.materiaId === Number(pm.collectionVariables.get(\"materiaAlerta\")));",
+                  "pm.test(\"Identifica la materia (CA-05.4)\", () => {",
+                  "  pm.expect(a).to.not.be.undefined;",
+                  "  pm.expect(a.materia).to.eql(\"Alertas QA Tormenta\");",
+                  "});",
+                  "pm.test(\"Corte en curso 3, Tormenta y nota necesaria 5.36\", () => {",
+                  "  pm.expect(a.corte).to.eql(3);",
+                  "  pm.expect(a.nivelRiesgo).to.eql(\"TORMENTA\");",
+                  "  pm.expect(a.notaNecesaria).to.be.closeTo(5.36, 0.0001);",
+                  "});",
+                  "pm.test(\"Guarda id y fecha de generación (CA-05.8)\", () => {",
+                  "  pm.expect(a.id).to.be.a(\"number\");",
+                  "  pm.expect(a.fechaGeneracion).to.match(/^\\d{4}-\\d{2}-\\d{2}T/);",
+                  "});",
+                  "pm.test(\"Fecha de cierre del corte 3 y días para el cierre (CA-05.3)\", () => {",
+                  "  pm.expect(a.fechaCierreCorte).to.eql(\"2026-11-28\");",
+                  "  pm.expect(a.diasParaCierre).to.eql(diasEntre(a.fechaGeneracion.substring(0, 10), a.fechaCierreCorte));",
+                  "});",
+                  "pm.test(\"Mensaje con la nota necesaria\", () => pm.expect(a.mensaje).to.eql(\"Necesitas 5.36 en el corte 3 para aprobar Alertas QA Tormenta.\"));",
+                  "pm.test(\"Opción de tutoría (CA-05.5, RN-02)\", () => pm.expect(a.tutoria).to.eql({disponible: true, solicitarEn: \"/api/tutorias\"}));",
+                  "pm.test(\"Aviso de fuente no oficial (CA-05.6, RN-03)\", () => pm.expect(a.aviso).to.eql(\"Este sistema no es la fuente oficial de notas. Verifica en intraUAM.\"));",
+                  "pm.collectionVariables.set(\"alertaTormenta\", a.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-50 (paso 1) Crear materia «Alertas QA Nublado»",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias"
+              ]
+            },
+            "description": "Crea una materia sin notas para CP-50; guarda su id en materiaNublado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Alertas QA Nublado\",\n  \"docente\": \"Docente de prueba QA\",\n  \"horario\": {\n    \"dias\": [\n      \"VIERNES\"\n    ],\n    \"horaInicio\": \"14:00\",\n    \"horaFin\": \"16:00\"\n  },\n  \"salon\": \"E-301\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"materiaNublado\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-50 (paso 2) Corte 1 en 1.0: Nublado, alerta del corte 2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/{{materiaNublado}}/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "{{materiaNublado}}",
+                "notas"
+              ]
+            },
+            "description": "CA-05.2, CA-05.3. Na 0.3, Pr 70, nota necesaria 3.79 → Nublado: alerta del corte en curso (2). Si la fecha de cierre del corte ya pasó, la alerta sale igual con los días que correspondan.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corte\": 1,\n  \"descripcion\": \"Definitiva corte 1\",\n  \"valor\": 1.0,\n  \"porcentaje\": 100\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaNublado\") + \"/estado\", (err, res) => {",
+                  "  const e = res.json();",
+                  "  pm.test(\"Queda NUBLADO con nota necesaria 3.79\", () => {",
+                  "    pm.expect(e.nivelRiesgo).to.eql(\"NUBLADO\");",
+                  "    pm.expect(e.notaNecesaria).to.be.closeTo(3.79, 0.0001);",
+                  "  });",
+                  "  pm.test(\"El estado indica alerta generada\", () => pm.expect(e.alertaGenerada).to.eql(true));",
+                  "});",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/alertas\", (err, res) => {",
+                  "  const propias = res.json().filter(a => a.materiaId === Number(pm.collectionVariables.get(\"materiaNublado\")));",
+                  "  pm.test(\"Alerta del corte 2, Nublado\", () => {",
+                  "    pm.expect(propias.length).to.eql(1);",
+                  "    pm.expect(propias[0].corte).to.eql(2);",
+                  "    pm.expect(propias[0].nivelRiesgo).to.eql(\"NUBLADO\");",
+                  "    pm.expect(propias[0].fechaCierreCorte).to.eql(\"2026-10-17\");",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-51 Alertas de la más reciente a la más antigua",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/alertas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "alertas"
+              ]
+            },
+            "description": "Contrato GET /api/alertas: orden por fecha de generación descendente."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const lista = pm.response.json();",
+                  "const pos = v => lista.findIndex(a => a.materiaId === Number(pm.collectionVariables.get(v)));",
+                  "pm.test(\"La alerta de CP-50 aparece antes que la de CP-48\", () => {",
+                  "  pm.expect(pos(\"materiaNublado\")).to.be.at.least(0);",
+                  "  pm.expect(pos(\"materiaNublado\")).to.be.below(pos(\"materiaAlerta\"));",
+                  "});",
+                  "pm.test(\"Fechas en orden descendente\", () => {",
+                  "  for (let i = 1; i < lista.length; i++) pm.expect(lista[i - 1].fechaGeneracion >= lista[i].fechaGeneracion).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-52 (paso 1) Crear materia «Alertas QA Incompleta»",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias"
+              ]
+            },
+            "description": "Crea una materia sin notas para CP-52; guarda su id en materiaIncompleta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Alertas QA Incompleta\",\n  \"docente\": \"Docente de prueba QA\",\n  \"horario\": {\n    \"dias\": [\n      \"VIERNES\"\n    ],\n    \"horaInicio\": \"14:00\",\n    \"horaFin\": \"16:00\"\n  },\n  \"salon\": \"E-301\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"materiaIncompleta\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-52 (paso 2) Nota de 50% con 0.5: incompleta, sin alerta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/materias/{{materiaIncompleta}}/notas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "materias",
+                "{{materiaIncompleta}}",
+                "notas"
+              ]
+            },
+            "description": "CA-05.7, RN-01. Aunque la nota es muy baja, el corte 1 suma 50%: información incompleta, no se calcula riesgo ni se genera alerta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"corte\": 1,\n  \"descripcion\": \"Parcial 1\",\n  \"valor\": 0.5,\n  \"porcentaje\": 50\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/materias/\" + pm.collectionVariables.get(\"materiaIncompleta\") + \"/estado\", (err, res) => {",
+                  "  const e = res.json();",
+                  "  pm.test(\"Queda INFORMACION_INCOMPLETA sin nivel\", () => {",
+                  "    pm.expect(e.estado).to.eql(\"INFORMACION_INCOMPLETA\");",
+                  "    pm.expect(e.nivelRiesgo).to.eql(null);",
+                  "  });",
+                  "  pm.test(\"No genera alerta (estado)\", () => pm.expect(e.alertaGenerada).to.eql(false));",
+                  "});",
+                  "pm.sendRequest(pm.variables.get(\"baseUrl\") + \"/api/alertas\", (err, res) => {",
+                  "  const propias = res.json().filter(a => a.materiaId === Number(pm.collectionVariables.get(\"materiaIncompleta\")));",
+                  "  pm.test(\"No genera alerta (lista de alertas)\", () => pm.expect(propias.length).to.eql(0));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CP-53 El pronóstico refleja las materias nuevas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pronostico",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pronostico"
+              ]
+            },
+            "description": "CA-05.1, CA-05.2."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "const porVar = v => p.materias.find(m => m.materiaId === Number(pm.collectionVariables.get(v)));",
+                  "pm.test(\"Materia de CP-48 en TORMENTA con 5.36\", () => {",
+                  "  pm.expect(porVar(\"materiaAlerta\").nivelRiesgo).to.eql(\"TORMENTA\");",
+                  "  pm.expect(porVar(\"materiaAlerta\").notaNecesaria).to.be.closeTo(5.36, 0.0001);",
+                  "});",
+                  "pm.test(\"Materia de CP-50 en NUBLADO con 3.79\", () => pm.expect(porVar(\"materiaNublado\").nivelRiesgo).to.eql(\"NUBLADO\"));",
+                  "pm.test(\"Materia de CP-52 incompleta\", () => pm.expect(porVar(\"materiaIncompleta\").estado).to.eql(\"INFORMACION_INCOMPLETA\"));"
                 ]
               }
             }
